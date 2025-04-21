@@ -1,0 +1,32 @@
+{
+  "name": "cof",
+  "version": "1.0.0",
+  "description": "Clash of Farms (COF) is a browser-based strategy game that blends dynamic battles with immersive farm management. Built for the Spring Hackathon 2025, hosted by Serverless Guru, the game challenges players to grow, defend, and dominate.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "workspaces": [
+    "packages/*",
+    "infrastructure"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sandjio/cof.git"
+  },
+  "keywords": [],
+  "author": "Sandjio",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Sandjio/cof/issues"
+  },
+  "homepage": "https://github.com/Sandjio/cof#readme",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
