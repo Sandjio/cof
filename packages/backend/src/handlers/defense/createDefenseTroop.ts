@@ -1,11 +1,10 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
 import { docClient } from "../../../../shared/src/lib/dynamoClient";
 
 // Environment Variables
-const DEFENSE_TABLE_NAME = process.env.PLANTS_TABLE_NAME!;
-const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
+const GAME_TABLE_NAME = process.env.GAME_TABLE_NAME!;
 
 export const handler = async (
   event: APIGatewayProxyEvent
@@ -25,11 +24,13 @@ export const handler = async (
     // 1. Fetch Player Profile
     const playerResult = await docClient.send(
       new GetCommand({
-        TableName: PLAYERS_TABLE_NAME,
-        Key: { playerId },
+        TableName: GAME_TABLE_NAME,
+        Key: { PK: `PLAYER#${playerId}`, SK: `PROFILE#` },
       })
     );
+
     const player = playerResult.Item;
+
     if (!player) {
       return {
         statusCode: 404,
@@ -47,37 +48,53 @@ export const handler = async (
     }
 
     // 3. Create Defense Troop
-    const defenseTroop = {
-      defenseTroopId: uuidv4(),
-      playerId,
+    const defenseTroopId = uuidv4();
+    const now = new Date().toISOString();
+    const defenseTroopItem = {
+      PK: `PLAYER#${playerId}`,
+      SK: `DEFENSE_TROOP#${defenseTroopId}`,
+      defenseTroopId,
       name,
       type: type || "unknown",
       cost,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
-    await docClient.send(
-      new PutCommand({
-        TableName: DEFENSE_TABLE_NAME,
-        Item: defenseTroop,
-      })
-    );
+
     // 4. Update Player Gold
     await docClient.send(
-      new UpdateCommand({
-        TableName: PLAYERS_TABLE_NAME,
-        Key: { playerId },
-        UpdateExpression: "SET gold = :newGold",
-        ExpressionAttributeValues: {
-          ":newGold": player.gold - cost,
-        },
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: GAME_TABLE_NAME,
+              Item: defenseTroopItem,
+              ConditionExpression:
+                "attribute_not_exists(PK) AND attribute_not_exists(SK)",
+            },
+          },
+          {
+            Update: {
+              TableName: GAME_TABLE_NAME,
+              Key: {
+                PK: `PLAYER#${playerId}`,
+                SK: `PROFILE#`,
+              },
+              UpdateExpression: "SET gold = gold - :cost",
+              ConditionExpression: "gold >= :cost",
+              ExpressionAttributeValues: {
+                ":cost": cost,
+              },
+            },
+          },
+        ],
       })
     );
     return {
       statusCode: 201,
       body: JSON.stringify({
         message: "Defense Troop created successfully.",
-        defenseTroop: defenseTroop,
+        defenseTroop: defenseTroopItem,
         newGoldAmount: player.gold - cost,
       }),
     };

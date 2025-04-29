@@ -25,8 +25,7 @@ describe("Create a Defense Troop Lambda Handler", () => {
   });
   beforeEach(() => {
     (docClient.send as jest.Mock).mockReset();
-    process.env.PLAYERS_TABLE_NAME = "PlayersTable";
-    process.env.DEFENSE_TABLE_NAME = "DefenseTable";
+    process.env.GAME_TABLE_NAME = "TestTable";
   });
 
   test("returns 400 for missing required fields", async () => {
@@ -65,8 +64,7 @@ describe("Create a Defense Troop Lambda Handler", () => {
   test("creates a defense troop and update gold successfully", async () => {
     (docClient.send as jest.Mock)
       .mockResolvedValueOnce({ Item: mockPlayer }) // Get player
-      .mockResolvedValueOnce({}) // Create Defense Troop
-      .mockResolvedValueOnce({}); // Update gold
+      .mockResolvedValueOnce({}); // Create Defense Troop
 
     const event = mockEvent({
       name: "Test",
@@ -81,8 +79,9 @@ describe("Create a Defense Troop Lambda Handler", () => {
     const body = JSON.parse(response.body);
     expect(body.message).toBe("Defense Troop created successfully.");
     expect(body.defenseTroop).toEqual({
+      PK: "PLAYER#123",
+      SK: "DEFENSE_TROOP#mocked-uuid-1234",
       defenseTroopId: "mocked-uuid-1234",
-      playerId: "123",
       name: "Test",
       type: "archer",
       cost: 100,
@@ -108,6 +107,7 @@ describe("Create a Defense Troop Lambda Handler", () => {
   });
 
   test("returns 500 for DynamoDB errors", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
     (docClient.send as jest.Mock).mockRejectedValue(new Error("DB Error"));
     const event = mockEvent({
       name: "Test",

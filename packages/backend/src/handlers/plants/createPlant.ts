@@ -1,11 +1,10 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
 import { docClient } from "../../../../shared/src/lib/dynamoClient";
 
 // Environment Variables
-const PLANTS_TABLE_NAME = process.env.PLANTS_TABLE_NAME!;
-const PLAYERS_TABLE_NAME = process.env.PLAYERS_TABLE_NAME!;
+const GAME_TABLE_NAME = process.env.GAME_TABLE_NAME;
 
 export const handler = async (
   event: APIGatewayProxyEvent
@@ -28,8 +27,8 @@ export const handler = async (
     // 1. Fetch Player Profile
     const playerResult = await docClient.send(
       new GetCommand({
-        TableName: PLAYERS_TABLE_NAME,
-        Key: { playerId },
+        TableName: GAME_TABLE_NAME,
+        Key: { PK: `PLAYER#${playerId}`, SK: `PROFILE#` },
       })
     );
 
@@ -51,33 +50,47 @@ export const handler = async (
     }
 
     // 3. Create the Plant
-    const plant = {
-      plantId: uuidv4(),
-      playerId,
+    const plantId = uuidv4();
+    const now = new Date().toISOString();
+    const plantItem = {
+      PK: `PLAYER#${playerId}`,
+      SK: `PLANT#${plantId}`,
+      plantId,
       name,
       type: type || "unknown",
       cost,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     await docClient.send(
-      new PutCommand({
-        TableName: PLANTS_TABLE_NAME,
-        Item: plant,
-      })
-    );
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: GAME_TABLE_NAME,
+              Item: plantItem,
+              // you could add a condition here to ensure no duplicate plantId
 
-    // 4. Deduct Gold from Player
-    await docClient.send(
-      new UpdateCommand({
-        TableName: PLAYERS_TABLE_NAME,
-        Key: { playerId },
-        UpdateExpression: "SET gold = gold - :cost",
-        ExpressionAttributeValues: {
-          ":cost": cost,
-        },
-        ConditionExpression: "gold >= :cost", // Prevent race conditions
+              ConditionExpression:
+                "attribute_not_exists(PK) AND attribute_not_exists(SK)",
+            },
+          },
+          {
+            Update: {
+              TableName: GAME_TABLE_NAME,
+              Key: {
+                PK: `PLAYER#${playerId}`,
+                SK: `PROFILE#`,
+              },
+              UpdateExpression: "SET gold = gold - :cost",
+              ConditionExpression: "gold >= :cost",
+              ExpressionAttributeValues: {
+                ":cost": cost,
+              },
+            },
+          },
+        ],
       })
     );
 
@@ -85,7 +98,7 @@ export const handler = async (
       statusCode: 201,
       body: JSON.stringify({
         message: "Plant purchased successfully!",
-        plant,
+        plant: plantItem,
         newGoldAmount: player.gold - cost,
       }),
     };

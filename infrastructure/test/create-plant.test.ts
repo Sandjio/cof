@@ -26,8 +26,7 @@ describe("Create Plant Lambda Handler", () => {
 
   beforeEach(() => {
     (docClient.send as jest.Mock).mockReset();
-    process.env.PLAYERS_TABLE_NAME = "PlayersTable";
-    process.env.PLANTS_TABLE_NAME = "PlantsTable";
+    process.env.GAME_TABLE_NAME = "TestTable";
   });
 
   test("returns 400 for missing required fields", async () => {
@@ -67,8 +66,7 @@ describe("Create Plant Lambda Handler", () => {
   test("creates plant and updates gold successfully", async () => {
     (docClient.send as jest.Mock)
       .mockResolvedValueOnce({ Item: mockPlayer }) // Get player
-      .mockResolvedValueOnce({}) // Create plant
-      .mockResolvedValueOnce({}); // Update gold
+      .mockResolvedValueOnce({}); // Create plant
 
     const event = mockEvent({
       name: "Oak",
@@ -83,8 +81,9 @@ describe("Create Plant Lambda Handler", () => {
     const body = JSON.parse(response.body);
     expect(body.message).toBe("Plant purchased successfully!");
     expect(body.plant).toEqual({
+      PK: "PLAYER#123",
+      SK: "PLANT#mocked-uuid-1234",
       plantId: "mocked-uuid-1234",
-      playerId: "123",
       name: "Oak",
       type: "Tree",
       cost: 500,
@@ -95,6 +94,7 @@ describe("Create Plant Lambda Handler", () => {
   });
 
   test("returns 500 for DynamoDB errors", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
     (docClient.send as jest.Mock).mockRejectedValue(new Error("DB Error"));
     const event = mockEvent({
       name: "Oak",

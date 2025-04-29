@@ -69,6 +69,7 @@ export class InfrastructureStack extends cdk.Stack {
       }
     );
 
+    // Create a DynamoDB table for game data
     const gameTable = new dynamodb.Table(this, "gameTable", {
       partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "SK", type: dynamodb.AttributeType.STRING },
@@ -76,6 +77,9 @@ export class InfrastructureStack extends cdk.Stack {
       tableName: process.env.GAME_TABLE_NAME,
     });
 
+    // Create a Lambda function for post-confirmation trigger
+    // This function will be triggered after a user confirms their account
+    // and will create a player profile in the DynamoDB table
     const postConfirmationFunction = new lambdaNodejs.NodejsFunction(
       this,
       "PostConfirmation",
@@ -104,6 +108,7 @@ export class InfrastructureStack extends cdk.Stack {
       postConfirmationFunction
     );
 
+    // Create a Lambda function for creating a plant
     const createPlantFunction = new lambdaNodejs.NodejsFunction(
       this,
       "CreatePlantFunction",
@@ -127,6 +132,7 @@ export class InfrastructureStack extends cdk.Stack {
 
     gameTable.grantWriteData(createPlantFunction);
 
+    // Create a Lambda function for creating a defense troop
     const createDefenseTroopFunction = new lambdaNodejs.NodejsFunction(
       this,
       "CreateDefenseTroopFunction",
