@@ -1,14 +1,32 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as path from "path";
+import * as dotenv from "dotenv";
+
+dotenv.config({ path: path.join(__dirname, "../..", ".env") });
 
 export class InfrastructureStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    // Check if USER_POOL_NAME environment variable is set
+    if (!process.env.USER_POOL_NAME) {
+      throw new Error("USER_POOL_NAME environment variable is not set");
+    }
+    if (!process.env.GAME_TABLE_NAME) {
+      throw new Error("GAME_TABLE_NAME environment variable is not set");
+    }
+    if (!process.env.USER_POOL_CLIENT_NAME) {
+      throw new Error("USER_POOL_CLIENT_NAME environment variable is not set");
+    }
+
     // Create a Cognito User Pool
     const userPool = new cognito.UserPool(this, "ClashOfFarmsUserPool", {
-      userPoolName: "ClashOfFarmsUserPool",
+      userPoolName: process.env.USER_POOL_NAME,
       selfSignUpEnabled: true, // Allow users to sign up
       autoVerify: { email: true }, // Automatically verify email
       signInAliases: { email: true }, // Allow sign-in with email
@@ -28,7 +46,7 @@ export class InfrastructureStack extends cdk.Stack {
       "ClashOfFarmsUserPoolClient",
       {
         userPool,
-        userPoolClientName: "ClashOfFarmsWebClient",
+        userPoolClientName: process.env.USER_POOL_CLIENT_NAME,
         authFlows: {
           userPassword: true, // Enable USER_PASSWORD_AUTH for email/password login
           userSrp: true, // Enable Secure Remote Password (SRP) for secure authentication
@@ -42,10 +60,47 @@ export class InfrastructureStack extends cdk.Stack {
             cognito.OAuthScope.OPENID,
             cognito.OAuthScope.PROFILE,
           ], // OAuth scopes
-          callbackUrls: ["http://localhost:3000/"],
-          logoutUrls: ["http://localhost:3000/logout"],
+          callbackUrls: [process.env.CALLBACK_URL || "http://localhost:3000/"],
+          logoutUrls: [
+            process.env.LOGOUT_URL || "http://localhost:3000/logout",
+          ],
         },
       }
+    );
+
+    const gameTable = new dynamodb.Table(this, "gameTable", {
+      partitionKey: { name: "PK", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "SK", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      tableName: process.env.GAME_TABLE_NAME,
+    });
+
+    const postConfirmationFunction = new lambdaNodejs.NodejsFunction(
+      this,
+      "PostConfirmation",
+      {
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/players/postConfirmation.ts"
+        ),
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: "handler",
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+      }
+    );
+
+    gameTable.grantWriteData(postConfirmationFunction);
+
+    userPool.addTrigger(
+      cognito.UserPoolOperation.POST_CONFIRMATION,
+      postConfirmationFunction
     );
 
     // Output the User Pool ID and Client ID for use in the frontend
