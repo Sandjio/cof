@@ -6,6 +6,7 @@ import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as path from "path";
 import * as dotenv from "dotenv";
+import * as aws_apigateway from "aws-cdk-lib/aws-apigateway";
 
 dotenv.config({ path: path.join(__dirname, "../..", ".env") });
 
@@ -103,15 +104,75 @@ export class InfrastructureStack extends cdk.Stack {
       postConfirmationFunction
     );
 
-    // Output the User Pool ID and Client ID for use in the frontend
+    const createPlantFunction = new lambdaNodejs.NodejsFunction(
+      this,
+      "CreatePlantFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/plants/createPlant.ts"
+        ),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+      }
+    );
+
+    gameTable.grantWriteData(createPlantFunction);
+
+    // Create a Rest API Gateway
+    const api = new aws_apigateway.RestApi(this, "ClashOfFarmsApi", {
+      restApiName: "Clash Of Farms Api",
+      description: "API for Clash of Farms game",
+      defaultCorsPreflightOptions: {
+        allowOrigins: aws_apigateway.Cors.ALL_ORIGINS, // Allow all origins for development
+        allowMethods: aws_apigateway.Cors.ALL_METHODS, // Allow all methods
+        allowHeaders: ["Content-Type", "Authorization"], // Allow specific headers
+      },
+      deployOptions: {
+        stageName: "dev",
+      },
+    });
+    const authorizer = new aws_apigateway.CognitoUserPoolsAuthorizer(
+      this,
+      "ClashOfFarmsAuthorizer",
+      {
+        cognitoUserPools: [userPool],
+      }
+    );
+
+    const plant = api.root.addResource("plant");
+
+    plant.addMethod(
+      "POST",
+      new aws_apigateway.LambdaIntegration(createPlantFunction),
+      {
+        authorizer,
+        authorizationType: aws_apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Output the User Pool ID
     new cdk.CfnOutput(this, "UserPoolId", {
       value: userPool.userPoolId,
       description: "Cognito User Pool ID",
     });
-
+    //Output the Client ID
     new cdk.CfnOutput(this, "UserPoolClientId", {
       value: userPoolClient.userPoolClientId,
       description: "Cognito User Pool Client ID",
+    });
+    // Output the API url
+    new cdk.CfnOutput(this, "ApiEndpoint", {
+      value: api.url,
+      description: "API Endpoint",
     });
   }
 }
