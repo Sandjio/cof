@@ -127,6 +127,28 @@ export class InfrastructureStack extends cdk.Stack {
 
     gameTable.grantWriteData(createPlantFunction);
 
+    const createDefenseTroopFunction = new lambdaNodejs.NodejsFunction(
+      this,
+      "CreateDefenseTroopFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_18_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/defense/createDefenseTroop.ts"
+        ),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+      }
+    );
+    gameTable.grantWriteData(createDefenseTroopFunction);
+
     // Create a Rest API Gateway
     const api = new aws_apigateway.RestApi(this, "ClashOfFarmsApi", {
       restApiName: "Clash Of Farms Api",
@@ -159,6 +181,15 @@ export class InfrastructureStack extends cdk.Stack {
       }
     );
 
+    const defenseTroop = api.root.addResource("defense-troop");
+    defenseTroop.addMethod(
+      "POST",
+      new aws_apigateway.LambdaIntegration(createDefenseTroopFunction),
+      {
+        authorizer,
+        authorizationType: aws_apigateway.AuthorizationType.COGNITO,
+      }
+    );
     // Output the User Pool ID
     new cdk.CfnOutput(this, "UserPoolId", {
       value: userPool.userPoolId,
