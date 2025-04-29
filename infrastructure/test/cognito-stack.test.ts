@@ -1,4 +1,4 @@
-import { App, Stack } from "aws-cdk-lib";
+import { App } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { InfrastructureStack } from "../lib/infrastructure-stack";
 
@@ -17,7 +17,7 @@ describe("InfrastructureStack", () => {
   describe("User Pool", () => {
     it("should create a User Pool with the correct name", () => {
       template.hasResourceProperties("AWS::Cognito::UserPool", {
-        UserPoolName: "ClashOfFarmsUserPool",
+        UserPoolName: process.env.USER_POOL_NAME,
       });
     });
 
