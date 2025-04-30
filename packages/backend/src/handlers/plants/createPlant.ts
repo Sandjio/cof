@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
-import { docClient } from "../../../../shared/src/lib/dynamoClient";
+import { docClient } from "shared/src/lib/dynamoClient";
 
 // Environment Variables
 const GAME_TABLE_NAME = process.env.GAME_TABLE_NAME;
