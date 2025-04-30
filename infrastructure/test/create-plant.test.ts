@@ -1,6 +1,6 @@
-import { handler } from "../../packages/backend/src/handlers/plants/createPlant";
+import { handler } from "backend/src/handlers/plants/createPlant";
 import { APIGatewayProxyEvent } from "aws-lambda";
-import { docClient } from "../../packages/shared/src/lib/dynamoClient";
+import { docClient } from "shared/src/lib/dynamoClient";
 
 jest.mock("uuid", () => ({ v4: () => "mocked-uuid-1234" }));
 jest.mock("../../packages/shared/src/lib/dynamoClient", () => ({
