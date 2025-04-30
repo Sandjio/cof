@@ -1,12 +1,17 @@
+import {
+  Duration,
+  aws_lambda as lambda,
+  aws_cognito as cognito,
+  aws_lambda_nodejs as lambdaNodejs,
+  aws_dynamodb as dynamodb,
+  aws_apigateway as apigateway,
+  aws_events as events,
+  aws_events_targets as targets,
+} from "aws-cdk-lib";
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
-import * as cognito from "aws-cdk-lib/aws-cognito";
-import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
-import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as path from "path";
 import * as dotenv from "dotenv";
-import * as aws_apigateway from "aws-cdk-lib/aws-apigateway";
 
 dotenv.config({ path: path.join(__dirname, "../..", ".env") });
 
@@ -41,6 +46,12 @@ export class InfrastructureStack extends cdk.Stack {
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY, // Recover account via email
     });
 
+    userPool.addDomain("ClashOfFarmsDomain", {
+      cognitoDomain: {
+        domainPrefix:
+          process.env.USER_POOL_DOMAIN_PREFIX || "clashoffarms-auth",
+      },
+    });
     // Create a User Pool Client for the web application
     const userPoolClient = new cognito.UserPoolClient(
       this,
@@ -66,6 +77,8 @@ export class InfrastructureStack extends cdk.Stack {
             process.env.LOGOUT_URL || "http://localhost:3000/logout",
           ],
         },
+        enableTokenRevocation: true, // Enable token revocation
+        preventUserExistenceErrors: true, // Prevent user existence errors
       }
     );
 
@@ -89,7 +102,7 @@ export class InfrastructureStack extends cdk.Stack {
           "../..",
           "packages/backend/src/handlers/players/postConfirmation.ts"
         ),
-        runtime: lambda.Runtime.NODEJS_18_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
@@ -113,7 +126,7 @@ export class InfrastructureStack extends cdk.Stack {
       this,
       "CreatePlantFunction",
       {
-        runtime: lambda.Runtime.NODEJS_18_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -130,14 +143,14 @@ export class InfrastructureStack extends cdk.Stack {
       }
     );
 
-    gameTable.grantWriteData(createPlantFunction);
+    gameTable.grantReadWriteData(createPlantFunction);
 
     // Create a Lambda function for creating a defense troop
     const createDefenseTroopFunction = new lambdaNodejs.NodejsFunction(
       this,
       "CreateDefenseTroopFunction",
       {
-        runtime: lambda.Runtime.NODEJS_18_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -153,22 +166,76 @@ export class InfrastructureStack extends cdk.Stack {
         projectRoot: path.join(__dirname, "../.."),
       }
     );
-    gameTable.grantWriteData(createDefenseTroopFunction);
+    gameTable.grantReadWriteData(createDefenseTroopFunction);
+
+    // Create a Lambda function for planting a seed
+    const plantSeedFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "PlantSeedHandler",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/plants/plantSeedEvent.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        timeout: Duration.seconds(30),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+      }
+    );
+
+    gameTable.grantReadWriteData(plantSeedFn);
+
+    // EventBridge Bus
+    const bus = new events.EventBus(this, "GameEventBus", {
+      eventBusName: "clash-of-farms-bus",
+    });
+    new events.Archive(this, "GameEventBusArchive", {
+      sourceEventBus: bus,
+      archiveName: "GameEventsArchive",
+      description: "Archive for game-related events",
+      retention: Duration.days(7), // Archive events for 7 days
+      eventPattern: {
+        source: ["event-router-service"],
+      },
+    });
+    // EventBridge Rule for plant.seed
+    new events.Rule(this, "PlantSeedRule", {
+      eventBus: bus,
+      eventPattern: {
+        source: ["event-router-service"],
+        detailType: ["MomentoMessage"],
+        detail: {
+          type: ["plant.seed"],
+        },
+      },
+      targets: [new targets.LambdaFunction(plantSeedFn)],
+    });
+
+    // Grant the EventBridge bus permission to invoke the Lambda function
+    bus.grantPutEventsTo(plantSeedFn);
 
     // Create a Rest API Gateway
-    const api = new aws_apigateway.RestApi(this, "ClashOfFarmsApi", {
+    const api = new apigateway.RestApi(this, "ClashOfFarmsApi", {
       restApiName: "Clash Of Farms Api",
       description: "API for Clash of Farms game",
       defaultCorsPreflightOptions: {
-        allowOrigins: aws_apigateway.Cors.ALL_ORIGINS, // Allow all origins for development
-        allowMethods: aws_apigateway.Cors.ALL_METHODS, // Allow all methods
+        allowOrigins: apigateway.Cors.ALL_ORIGINS, // Allow all origins for development
+        allowMethods: apigateway.Cors.ALL_METHODS, // Allow all methods
         allowHeaders: ["Content-Type", "Authorization"], // Allow specific headers
       },
       deployOptions: {
         stageName: "dev",
       },
     });
-    const authorizer = new aws_apigateway.CognitoUserPoolsAuthorizer(
+    const authorizer = new apigateway.CognitoUserPoolsAuthorizer(
       this,
       "ClashOfFarmsAuthorizer",
       {
@@ -180,22 +247,34 @@ export class InfrastructureStack extends cdk.Stack {
 
     plant.addMethod(
       "POST",
-      new aws_apigateway.LambdaIntegration(createPlantFunction),
+      new apigateway.LambdaIntegration(createPlantFunction),
       {
         authorizer,
-        authorizationType: aws_apigateway.AuthorizationType.COGNITO,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
       }
     );
 
     const defenseTroop = api.root.addResource("defense-troop");
     defenseTroop.addMethod(
       "POST",
-      new aws_apigateway.LambdaIntegration(createDefenseTroopFunction),
+      new apigateway.LambdaIntegration(createDefenseTroopFunction),
       {
         authorizer,
-        authorizationType: aws_apigateway.AuthorizationType.COGNITO,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
       }
     );
+
+    // Output the Cognito Hosted UI URL
+    new cdk.CfnOutput(this, "CognitoHostedUiUrl", {
+      value: `https://${
+        process.env.USER_POOL_DOMAIN_PREFIX || "clashoffarms-auth"
+      }.auth.${
+        this.region
+      }.amazoncognito.com/login?response_type=code&client_id=${
+        userPoolClient.userPoolClientId
+      }&redirect_uri=${process.env.CALLBACK_URL || "http://localhost:3000/"}`,
+      description: "Cognito Hosted UI Login URL",
+    });
     // Output the User Pool ID
     new cdk.CfnOutput(this, "UserPoolId", {
       value: userPool.userPoolId,
@@ -207,9 +286,9 @@ export class InfrastructureStack extends cdk.Stack {
       description: "Cognito User Pool Client ID",
     });
     // Output the API url
-    new cdk.CfnOutput(this, "ApiEndpoint", {
-      value: api.url,
-      description: "API Endpoint",
-    });
+    // new cdk.CfnOutput(this, "ApiEndpoint", {
+    //   value: api.url,
+    //   description: "API Endpoint",
+    // });
   }
 }
