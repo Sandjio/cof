@@ -64,7 +64,7 @@ describe("InfrastructureStack", () => {
 
     template.hasResourceProperties("AWS::Lambda::Function", {
       Handler: "index.handler",
-      Runtime: "nodejs18.x",
+      Runtime: "nodejs22.x",
       Environment: {
         Variables: {
           GAME_TABLE_NAME: Match.objectLike({ Ref: Match.anyValue() }),
