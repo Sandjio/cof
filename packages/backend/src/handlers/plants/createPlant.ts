@@ -70,8 +70,6 @@ export const handler = async (
             Put: {
               TableName: GAME_TABLE_NAME,
               Item: plantItem,
-              // you could add a condition here to ensure no duplicate plantId
-
               ConditionExpression:
                 "attribute_not_exists(PK) AND attribute_not_exists(SK)",
             },
