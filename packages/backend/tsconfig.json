@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "baseUrl": ".",
+    "baseUrl": "./",
     "paths": {
       "shared/*": ["../shared/src/*"]
     },
@@ -13,11 +13,8 @@
     "moduleResolution": "node",
     "sourceMap": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "../"
   },
   "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules"],
-  "paths": {
-    "shared/*": ["../shared/src/*"]
-  }
+  "exclude": ["node_modules"]
 }

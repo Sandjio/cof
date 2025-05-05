@@ -5,11 +5,12 @@
   "main": "index.js",
   "workspaces": [
     "packages/*",
-    "infrastructure"
+    "infrastructure",
+    "script"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -34,6 +35,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.797.0",
+    "@aws-sdk/client-secrets-manager": "^3.799.0",
     "@aws-sdk/lib-dynamodb": "^3.797.0",
     "@gomomento/sdk": "^1.111.0",
     "dotenv": "^16.5.0"
