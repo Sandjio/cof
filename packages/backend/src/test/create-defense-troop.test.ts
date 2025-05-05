@@ -1,13 +1,13 @@
-import { handler } from "backend/src/handlers/plants/createPlant";
+import { handler } from "../handlers/defense/createDefenseTroop";
 import { APIGatewayProxyEvent } from "aws-lambda";
 import { docClient } from "shared/src/lib/dynamoClient";
 
 jest.mock("uuid", () => ({ v4: () => "mocked-uuid-1234" }));
-jest.mock("../../packages/shared/src/lib/dynamoClient", () => ({
+jest.mock("shared/src/lib/dynamoClient", () => ({
   docClient: { send: jest.fn() },
 }));
 
-describe("Create Plant Lambda Handler", () => {
+describe("Create a Defense Troop Lambda Handler", () => {
   const mockPlayer = { playerId: "123", gold: 1000 };
   const mockEvent = (body: object): APIGatewayProxyEvent => ({
     body: JSON.stringify(body),
@@ -15,7 +15,7 @@ describe("Create Plant Lambda Handler", () => {
     multiValueHeaders: {},
     httpMethod: "POST",
     isBase64Encoded: false,
-    path: "/plant",
+    path: "defense-troop",
     pathParameters: null,
     queryStringParameters: null,
     multiValueQueryStringParameters: null,
@@ -23,7 +23,6 @@ describe("Create Plant Lambda Handler", () => {
     requestContext: {} as any,
     resource: "",
   });
-
   beforeEach(() => {
     (docClient.send as jest.Mock).mockReset();
     process.env.GAME_TABLE_NAME = "TestTable";
@@ -49,7 +48,6 @@ describe("Create Plant Lambda Handler", () => {
       message: "Player not found.",
     });
   });
-
   test("returns 400 for insufficient gold", async () => {
     (docClient.send as jest.Mock).mockResolvedValueOnce({
       Item: { ...mockPlayer, gold: 50 },
@@ -59,53 +57,69 @@ describe("Create Plant Lambda Handler", () => {
     const response = await handler(event);
     expect(response.statusCode).toBe(400);
     expect(JSON.parse(response.body)).toEqual({
-      message: "Not enough gold to buy this plant.",
+      message: "Not enough gold to buy this Defense Troop.",
     });
   });
 
-  test("creates plant and updates gold successfully", async () => {
+  test("creates a defense troop and update gold successfully", async () => {
     (docClient.send as jest.Mock)
       .mockResolvedValueOnce({ Item: mockPlayer }) // Get player
-      .mockResolvedValueOnce({}); // Create plant
+      .mockResolvedValueOnce({}); // Create Defense Troop
 
     const event = mockEvent({
-      name: "Oak",
-      cost: 500,
+      name: "Test",
+      cost: 100,
       playerId: "123",
-      type: "Tree",
+      type: "archer",
     });
 
     const response = await handler(event);
     expect(response.statusCode).toBe(201);
 
     const body = JSON.parse(response.body);
-    expect(body.message).toBe("Plant purchased successfully!");
-    expect(body.plant).toEqual({
+    expect(body.message).toBe("Defense Troop created successfully.");
+    expect(body.defenseTroop).toEqual({
       PK: "PLAYER#123",
-      SK: "PLANT#mocked-uuid-1234",
-      plantId: "mocked-uuid-1234",
-      name: "Oak",
-      type: "Tree",
-      cost: 500,
+      SK: "DEFENSE_TROOP#mocked-uuid-1234",
+      defenseTroopId: "mocked-uuid-1234",
+      name: "Test",
+      type: "archer",
+      cost: 100,
       createdAt: expect.any(String),
       updatedAt: expect.any(String),
     });
-    expect(body.newGoldAmount).toBe(500);
+    expect(body.newGoldAmount).toBe(900);
   });
 
-  test("returns 500 for DynamoDB errors", async () => {
+  test("handles errors gracefully", async () => {
     jest.spyOn(console, "error").mockImplementation(() => {});
     (docClient.send as jest.Mock).mockRejectedValue(new Error("DB Error"));
     const event = mockEvent({
-      name: "Oak",
-      cost: 500,
+      name: "Test",
+      cost: 100,
       playerId: "123",
     });
 
     const response = await handler(event);
     expect(response.statusCode).toBe(500);
     expect(JSON.parse(response.body)).toEqual({
-      message: "Failed to purchase plant.",
+      message: "Failed to create defense troop.",
+    });
+  });
+
+  test("returns 500 for DynamoDB errors", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    (docClient.send as jest.Mock).mockRejectedValue(new Error("DB Error"));
+    const event = mockEvent({
+      name: "Test",
+      cost: 100,
+      playerId: "123",
+    });
+
+    const response = await handler(event);
+    expect(response.statusCode).toBe(500);
+    expect(JSON.parse(response.body)).toEqual({
+      message: "Failed to create defense troop.",
     });
   });
 });
