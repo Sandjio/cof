@@ -212,7 +212,7 @@ export class InfrastructureStack extends cdk.Stack {
         entry: path.join(
           __dirname,
           "../..",
-          "packages/backend/src/handlers/battles/startBattle.ts"
+          "packages/backend/src/handlers/attack/startBattle.ts"
         ),
         bundling: {
           externalModules: ["aws-lambda"],
@@ -233,10 +233,194 @@ export class InfrastructureStack extends cdk.Stack {
 
     momentoApiKeySecret.grantRead(startBattleFunction);
 
+    const getPlantsFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "GetPlantsFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/plants/getPlants.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+      }
+    );
+
+    gameTable.grantReadData(getPlantsFn);
+
+    const getDefenseTroopsFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "GetDefenseTroopsFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/defense/getDefenseTroops.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+      }
+    );
+
+    gameTable.grantReadData(getDefenseTroopsFn);
+
+    const createAttackTroopFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "CreateAttackTroopFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/attack/createAttackTroop.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+      }
+    );
+
+    gameTable.grantReadWriteData(createAttackTroopFn);
+
+    const getAttackTroopsFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "GetAttackTroopsFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/attack/getAttackTroops.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+      }
+    );
+
+    gameTable.grantReadData(getAttackTroopsFn);
+
+    const upgradeTroopFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "UpgradeTroopFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/players/upgradeTroop.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+      }
+    );
+
+    gameTable.grantReadWriteData(upgradeTroopFn);
+
+    const createAttackRecipeFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "CreateAttackRecipeFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/attack/createAttackRecipe.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+      }
+    );
+    gameTable.grantWriteData(createAttackRecipeFn);
+
+    const getAttackRecipesFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "GetAttackRecipesFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/attack/getAttackRecipes.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+      }
+    );
+
+    gameTable.grantReadData(getAttackRecipesFn);
+
+    const getBattleResultsFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "GetBattleResultFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/attack/getBattleResults.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+        },
+      }
+    );
+
+    gameTable.grantReadData(getBattleResultsFn);
+
     // EventBridge Bus
     const bus = new events.EventBus(this, "GameEventBus", {
       eventBusName: "clash-of-farms-bus",
     });
+
     new events.Archive(this, "GameEventBusArchive", {
       sourceEventBus: bus,
       archiveName: "GameEventsArchive",
@@ -246,14 +430,18 @@ export class InfrastructureStack extends cdk.Stack {
         source: ["event-router-service"],
       },
     });
-    // EventBridge Rule for plant.seed
+
+    // EventBridge Rule for PlantSeeded event
     new events.Rule(this, "PlantSeedRule", {
       eventBus: bus,
       eventPattern: {
         source: ["event-router-service"],
-        detailType: ["MomentoMessage"],
+        detailType: ["PlantSeeded"],
         detail: {
-          type: ["plant.seed"],
+          eventType: ["PlantSeeded"],
+          payload: {
+            plantId: [{ exists: true }],
+          },
         },
       },
       targets: [new targets.LambdaFunction(plantSeedFn)],
@@ -284,7 +472,7 @@ export class InfrastructureStack extends cdk.Stack {
     );
 
     // Create Plant endpoint
-    const plant = api.root.addResource("plant");
+    const plant = api.root.addResource("plants");
     plant.addMethod(
       "POST",
       new apigateway.LambdaIntegration(createPlantFunction),
@@ -294,8 +482,21 @@ export class InfrastructureStack extends cdk.Stack {
       }
     );
 
+    // Endpoint to get all plants owned by a player
+    const gardens = api.root.addResource("gardens");
+    const player = gardens.addResource("{playerId}");
+    const playerPlants = player.addResource("plants");
+    playerPlants.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(getPlantsFn),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
     // Create Defense Troop endpoint
-    const defenseTroop = api.root.addResource("defense-troop");
+    const defenseTroop = api.root.addResource("defense-troops");
     defenseTroop.addMethod(
       "POST",
       new apigateway.LambdaIntegration(createDefenseTroopFunction),
@@ -305,11 +506,90 @@ export class InfrastructureStack extends cdk.Stack {
       }
     );
 
+    // Endpoint to get all defense troops owned by a player
+    const playerDefenseTroops = player.addResource("defense-troops");
+    playerDefenseTroops.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(getDefenseTroopsFn),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Create an Attack Troop endpoint
+    const attackTroop = api.root.addResource("attack-troops");
+    attackTroop.addMethod(
+      "POST",
+      new apigateway.LambdaIntegration(createAttackTroopFn),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Get all attack troops owned by a player
+    const playerAttackTroops = player.addResource("attack-troops");
+    playerAttackTroops.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(getAttackTroopsFn),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Upgrade a troop endpoint
+    const troops = api.root.addResource("troops");
+    const troopsId = troops.addResource("{troopId}");
+    const upgradeTroop = troopsId.addResource("upgrade");
+    upgradeTroop.addMethod(
+      "PATCH",
+      new apigateway.LambdaIntegration(upgradeTroopFn),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Create an Attack recipe endpoint
+    const attackRecipe = api.root.addResource("attack-recipes");
+    attackRecipe.addMethod(
+      "POST",
+      new apigateway.LambdaIntegration(createAttackRecipeFn),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Get all attack recipes owned by a player
+    const playerAttackRecipes = player.addResource("attack-recipes");
+    playerAttackRecipes.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(getAttackRecipesFn),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
     // Create Battle endpoint
-    const battle = api.root.addResource("battle");
+    const battle = api.root.addResource("battles");
     battle.addMethod(
       "POST",
       new apigateway.LambdaIntegration(startBattleFunction),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Get Battle results endpoint
+    const battleResults = battle.addResource("{battleId}");
+    battleResults.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(getBattleResultsFn),
       {
         authorizer,
         authorizationType: apigateway.AuthorizationType.COGNITO,
