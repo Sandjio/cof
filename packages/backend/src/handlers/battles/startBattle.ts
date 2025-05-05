@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { docClient } from "shared/lib/dynamoClient";
+import { docClient } from "shared/src/lib/dynamoClient";
 
 import {
   PutItemCommand,
