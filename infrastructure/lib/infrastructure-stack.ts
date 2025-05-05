@@ -7,6 +7,7 @@ import {
   aws_apigateway as apigateway,
   aws_events as events,
   aws_events_targets as targets,
+  aws_secretsmanager as secretsmanager,
 } from "aws-cdk-lib";
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
@@ -30,6 +31,11 @@ export class InfrastructureStack extends cdk.Stack {
       throw new Error("USER_POOL_CLIENT_NAME environment variable is not set");
     }
 
+    const momentoApiKeySecret = secretsmanager.Secret.fromSecretCompleteArn(
+      this,
+      "MomentoApiKeySecret",
+      "arn:aws:secretsmanager:us-east-1:223325094309:secret:clash-of-farms/momento-api-key-hVVNf2"
+    );
     // Create a Cognito User Pool
     const userPool = new cognito.UserPool(this, "ClashOfFarmsUserPool", {
       userPoolName: process.env.USER_POOL_NAME,
@@ -79,6 +85,9 @@ export class InfrastructureStack extends cdk.Stack {
         },
         enableTokenRevocation: true, // Enable token revocation
         preventUserExistenceErrors: true, // Prevent user existence errors
+        accessTokenValidity: Duration.days(1),
+        idTokenValidity: Duration.days(1),
+        refreshTokenValidity: Duration.days(30),
       }
     );
 
@@ -193,6 +202,37 @@ export class InfrastructureStack extends cdk.Stack {
 
     gameTable.grantReadWriteData(plantSeedFn);
 
+    // Create a Lambda function for creating a battle
+    const startBattleFunction = new lambdaNodejs.NodejsFunction(
+      this,
+      "startBattleFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/battles/startBattle.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        timeout: Duration.seconds(60),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+          SECRET_ARN: momentoApiKeySecret.secretArn,
+          SECRET_NAME: "clash-of-farms/momento-api-key",
+          CACHE_NAME: "clash-of-farms-cache",
+          DEBUG: "true",
+        },
+      }
+    );
+
+    gameTable.grantReadWriteData(startBattleFunction);
+
+    momentoApiKeySecret.grantRead(startBattleFunction);
+
     // EventBridge Bus
     const bus = new events.EventBus(this, "GameEventBus", {
       eventBusName: "clash-of-farms-bus",
@@ -243,8 +283,8 @@ export class InfrastructureStack extends cdk.Stack {
       }
     );
 
+    // Create Plant endpoint
     const plant = api.root.addResource("plant");
-
     plant.addMethod(
       "POST",
       new apigateway.LambdaIntegration(createPlantFunction),
@@ -254,10 +294,22 @@ export class InfrastructureStack extends cdk.Stack {
       }
     );
 
+    // Create Defense Troop endpoint
     const defenseTroop = api.root.addResource("defense-troop");
     defenseTroop.addMethod(
       "POST",
       new apigateway.LambdaIntegration(createDefenseTroopFunction),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
+      }
+    );
+
+    // Create Battle endpoint
+    const battle = api.root.addResource("battle");
+    battle.addMethod(
+      "POST",
+      new apigateway.LambdaIntegration(startBattleFunction),
       {
         authorizer,
         authorizationType: apigateway.AuthorizationType.COGNITO,
@@ -285,10 +337,5 @@ export class InfrastructureStack extends cdk.Stack {
       value: userPoolClient.userPoolClientId,
       description: "Cognito User Pool Client ID",
     });
-    // Output the API url
-    // new cdk.CfnOutput(this, "ApiEndpoint", {
-    //   value: api.url,
-    //   description: "API Endpoint",
-    // });
   }
 }
