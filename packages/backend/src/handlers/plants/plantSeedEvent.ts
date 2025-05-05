@@ -1,23 +1,20 @@
-import {
-  PutItemCommand,
-  GetItemCommand,
-  UpdateItemCommand,
-} from "@aws-sdk/client-dynamodb";
+import { GetItemCommand, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 import { docClient } from "shared/lib/dynamoClient";
+import { PlantSeededEvent } from "shared/src/events/plantEvent";
+import { EventBridgeEvent } from "aws-lambda";
 
 const GAME_TABLE_NAME = process.env.GAME_TABLE_NAME;
-export const handler = async (event: any) => {
+
+export const handler = async (
+  event: EventBridgeEvent<"PlantSeeded", PlantSeededEvent>
+) => {
+  const { playerId, payload } = event.detail;
+  const plantId = payload.plantId;
+
+  const pk = `PLAYER#${playerId}`;
+  const sk = `PLANT#${plantId}`;
+
   try {
-    const detail =
-      typeof event.detail === "string"
-        ? JSON.parse(event.detail)
-        : event.detail;
-    const playerId = detail.playerId;
-    const plantId = detail.plantId;
-
-    const pk = `PLAYER#${playerId}`;
-    const sk = `PLANT#${plantId}`;
-
     // Fetch the plant from DynamoDB
     const getResult = await docClient.send(
       new GetItemCommand({
@@ -30,12 +27,13 @@ export const handler = async (event: any) => {
     );
 
     if (!getResult.Item) {
-      console.error("Plant not found");
+      console.warn(`Plant ${plantId} for player ${playerId} not found.`);
       return {
         statusCode: 404,
-        body: "Plant not found",
+        body: JSON.stringify({ message: "Plant not found" }),
       };
     }
+
     // Update the plant with growth = seed
     await docClient.send(
       new UpdateItemCommand({
@@ -44,25 +42,22 @@ export const handler = async (event: any) => {
           PK: { S: pk },
           SK: { S: sk },
         },
-        UpdateExpression: "SET #growth = :growthVal",
-        ExpressionAttributeNames: {
-          "#growth": "growth",
-        },
+        UpdateExpression: "SET growth = :growth",
         ExpressionAttributeValues: {
-          ":growthVal": { S: "seed" },
+          ":growth": { S: "seed" },
         },
       })
     );
 
     return {
       statusCode: 200,
-      body: "Plant growth initialized to seed",
+      body: JSON.stringify({ message: "Plant growth set to 'seed'" }),
     };
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error("Error updating plant:", error);
     return {
       statusCode: 500,
-      body: "Error seeding plant",
+      body: JSON.stringify({ message: "Error seeding plant" }),
     };
   }
 };
