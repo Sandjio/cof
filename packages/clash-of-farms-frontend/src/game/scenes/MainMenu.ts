@@ -1,76 +1,65 @@
-import { GameObjects, Scene } from 'phaser';
+import { Scene, GameObjects } from "phaser";
+import { EventBus } from "../EventBus";
+import { channel } from "diagnostics_channel";
 
-import { EventBus } from '../EventBus';
+export class MainMenu extends Scene {
+    private background: GameObjects.Image;
+    // private backgroundMusic: Phaser.Sound.BaseSound;
 
-export class MainMenu extends Scene
-{
-    background: GameObjects.Image;
-    logo: GameObjects.Image;
-    title: GameObjects.Text;
-    logoTween: Phaser.Tweens.Tween | null;
-
-    constructor ()
-    {
-        super('MainMenu');
+    constructor() {
+        super("MainMenu");
     }
 
-    create ()
-    {
-        this.background = this.add.image(512, 384, 'background');
+    create() {
+        this.background = this.add.image(0, 0, "backgroundImage").setOrigin(0);
+        this.scaleBackground();
 
-        this.logo = this.add.image(512, 300, 'logo').setDepth(100);
+        // const music = this.sound.add("backgroundMusic", {
+        //     loop: true,
+        //     volume: 0.5,
+        // });
+        // music.play();
 
-        this.title = this.add.text(512, 460, 'Main Menu', {
-            fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5).setDepth(100);
+        const loginUrl = `${process.env.NEXT_PUBLIC_COGNITO_DOMAIN}/login?client_id=${process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID}&response_type=code&scope=email+openid+profile&redirect_uri=${process.env.NEXT_PUBLIC_REDIRECT_URI}`;
 
-        EventBus.emit('current-scene-ready', this);
+        const centerX = this.cameras.main.width / 2;
+        const centerY = this.cameras.main.height / 2;
+
+        const loginText = this.add
+            .text(centerX, centerY, "Login to Play", {
+                fontSize: "32px",
+                color: "#ffffff",
+                backgroundColor: "#000000aa",
+                padding: { x: 12, y: 6 },
+            })
+            .setOrigin(0.5)
+            .setInteractive();
+
+        loginText.on("pointerdown", () => {
+            // if (!this.backgroundMusic || !this.backgroundMusic.isPlaying) {
+            //     this.backgroundMusic = this.sound.add("backgroundMusic", {
+            //         loop: true,
+            //         volume: 0.5,
+            //     });
+            //     this.backgroundMusic.play();
+            // }
+            window.location.href = loginUrl;
+        });
+
+        this.scale.on("resize", this.resize, this);
+
+        EventBus.emit("current-scene-ready", this);
     }
-    
-    changeScene ()
-    {
-        if (this.logoTween)
-        {
-            this.logoTween.stop();
-            this.logoTween = null;
-        }
 
-        this.scene.start('Game');
+    private scaleBackground() {
+        const { width, height } = this.scale.gameSize;
+        this.background.setDisplaySize(width, height);
     }
 
-    moveLogo (reactCallback: ({ x, y }: { x: number, y: number }) => void)
-    {
-        if (this.logoTween)
-        {
-            if (this.logoTween.isPlaying())
-            {
-                this.logoTween.pause();
-            }
-            else
-            {
-                this.logoTween.play();
-            }
-        } 
-        else
-        {
-            this.logoTween = this.tweens.add({
-                targets: this.logo,
-                x: { value: 750, duration: 3000, ease: 'Back.easeInOut' },
-                y: { value: 80, duration: 1500, ease: 'Sine.easeOut' },
-                yoyo: true,
-                repeat: -1,
-                onUpdate: () => {
-                    if (reactCallback)
-                    {
-                        reactCallback({
-                            x: Math.floor(this.logo.x),
-                            y: Math.floor(this.logo.y)
-                        });
-                    }
-                }
-            });
-        }
+    private resize(gameSize: Phaser.Structs.Size) {
+        const { width, height } = gameSize;
+        this.cameras.resize(width, height);
+        this.background.setDisplaySize(width, height);
     }
 }
+
