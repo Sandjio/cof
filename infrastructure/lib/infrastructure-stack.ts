@@ -78,9 +78,11 @@ export class InfrastructureStack extends cdk.Stack {
             cognito.OAuthScope.OPENID,
             cognito.OAuthScope.PROFILE,
           ], // OAuth scopes
-          callbackUrls: [process.env.CALLBACK_URL || "http://localhost:3000/"],
+          callbackUrls: [
+            process.env.CALLBACK_URL || "http://localhost:8080/auth/callback",
+          ],
           logoutUrls: [
-            process.env.LOGOUT_URL || "http://localhost:3000/logout",
+            process.env.LOGOUT_URL || "http://localhost:8080/logout",
           ],
         },
         enableTokenRevocation: true, // Enable token revocation
