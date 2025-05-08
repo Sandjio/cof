@@ -28,8 +28,11 @@ export class Preloader extends Scene {
         this.load.image("backgroundImage", "background.png");
         this.load.audio("backgroundMusic", "/audio/springtime-symphony.mp3");
         this.load.image("ground", "grass.png");
-
         this.load.image("barn", "Barn.png");
+        this.load.image("goldCoin", "gold_coin.png");
+        this.load.image("trophy", "golden-trophy-medium.png");
+        this.load.image("fight", "fight.png");
+        this.load.image("shop", "shop.png");
     }
 
     create() {
