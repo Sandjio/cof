@@ -1,5 +1,4 @@
 import { GameObjects, Scene, Math as PhaserMath } from "phaser";
-
 import { EventBus } from "../EventBus";
 
 export class Game extends Scene {
@@ -7,84 +6,258 @@ export class Game extends Scene {
     private isDragging: boolean = false;
     private lastPointerPosition: { x: number; y: number } | null = null;
     private worldSize = {
-        width: window.innerWidth,
-        height: window.innerHeight,
-    }; // Adjust based on your map size
-    private minimapCamera?: Phaser.Cameras.Scene2D.Camera;
+        width: window.innerWidth * 3, // Make world significantly larger than screen
+        height: window.innerHeight * 3,
+    };
     private mainCamera?: Phaser.Cameras.Scene2D.Camera;
+
+    // Game UI Elements
+    private goldCoin?: GameObjects.Sprite;
+    private goldText?: GameObjects.Text;
+    private trophy?: GameObjects.Image;
+    private trophyText?: GameObjects.Text;
+    private fight?: GameObjects.Image;
+    private shop?: GameObjects.Image;
+
+    private uiCamera?: Phaser.Cameras.Scene2D.Camera;
+    private worldContainer: Phaser.GameObjects.Container;
+    // private debugText?: GameObjects.Text;
+    private isDraggingSprite = false;
+    private placeableConfigs: Array<{
+        key: string;
+        x: number;
+        y: number;
+        scale?: number;
+    }> = [
+        {
+            key: "barn",
+            x: this.worldSize.width / 2,
+            y: this.worldSize.height / 2,
+            scale: 0.1,
+        },
+    ];
+
     constructor() {
         super("Game");
     }
 
     create() {
+        // Initialize the world container first
+        this.worldContainer = this.add.container(0, 0);
+
         // Set up the world
         this.createWorld();
 
         // Set up the main camera with boundaries
         this.setupMainCamera();
 
+        // create all configured placeables
+        this.placeableConfigs.forEach((cfg) => this.createPlaceable(cfg));
+
+        this.setupUICamera();
+
         // Set up camera controls
         this.setupCameraControls();
 
-        this.placeFarmHouse();
+        // Add debug text for zoom level
+        // this.debugText = this.add.text(10, 10, "Zoom: 1.0", {
+        //     fontFamily: "Arial",
+        //     fontSize: "18px",
+        //     color: "#FFFFFF",
+        //     backgroundColor: "#000000",
+        // });
+        // this.debugText.setScrollFactor(0);
+        // this.debugText.setDepth(1000);
 
-        // Optional: Set up minimap
-        // this.setupMinimap();
+        // Add a grid to make zoom more noticeable
+        this.createVisualGrid();
 
         // Notify that the scene is ready
         EventBus.emit("current-scene-ready", this);
     }
 
-    placeFarmHouse() {
-        // Create town hall in the center of the map
-        const centerX = this.worldSize.width / 2;
-        const centerY = this.worldSize.height / 2;
+    createVisualGrid() {
+        // Create a grid pattern across the world to make zoom more visually noticeable
+        const gridSize = 100;
+        const graphics = this.add.graphics();
 
-        const barn = this.add
-            .image(centerX, centerY, "barn")
-            .setOrigin(0.5, 0.5);
-        barn.setScale(0.1); // Adjust scale as needed
+        // Set line style
+        graphics.lineStyle(2, 0x00ff00, 0.3);
 
-        // Focus camera on town hall
-        if (this.mainCamera) {
-            this.mainCamera.centerOn(centerX, centerY);
+        // Draw vertical lines
+        for (let x = 0; x <= this.worldSize.width; x += gridSize) {
+            graphics.moveTo(x, 0);
+            graphics.lineTo(x, this.worldSize.height);
         }
 
-        // Listen for town hall selection events
-        this.events.on("building-selected", (building) => {
-            console.log("Town Hall selected");
-            // Implement your UI elements or game logic when town hall is selected
-            // For example, show upgrade options or building details
-        });
+        // Draw horizontal lines
+        for (let y = 0; y <= this.worldSize.height; y += gridSize) {
+            graphics.moveTo(0, y);
+            graphics.lineTo(this.worldSize.width, y);
+        }
+
+        // Add to world container
+        graphics.setDepth(10);
+        this.worldContainer.add(graphics);
+    }
+
+    setupUICamera() {
+        // Create a separate camera for UI elements
+        this.uiCamera = this.cameras.add(
+            0,
+            0,
+            this.scale.width,
+            this.scale.height
+        );
+        this.uiCamera.setScroll(0, 0);
+        this.uiCamera.setZoom(1); // Always at 1x zoom
+        this.uiCamera.setName("UICamera");
+
+        // Add gold coin to the top right
+        this.goldCoin = this.add
+            .sprite(
+                this.scale.width - 50, // Position from right
+                50, // Position from top
+                "goldCoin"
+            )
+            .setScale(0.1);
+
+        // Add a text to show gold count
+        this.goldText = this.add
+            .text(
+                this.scale.width - 90,
+                50,
+                "1000", // Initial gold amount
+                {
+                    fontFamily: "Arial",
+                    fontSize: "24px",
+                    color: "#FFD700",
+                }
+            )
+            .setOrigin(1, 0.5);
+
+        // Add trophy image to the top left of the scene
+        this.trophy = this.add.image(50, 50, "trophy").setScale(0.2);
+        this.trophyText = this.add
+            .text(80, 50, "0", {
+                fontFamily: "Arial",
+                fontSize: "24px",
+                color: "#FFD700",
+            })
+            .setOrigin(0, 0.5);
+
+        // Add Battle image at the bottom left of the scene
+        this.fight = this.add
+            .image(60, this.scale.height - 100, "fight")
+            .setScale(0.1);
+
+        // Add the shop icon at the bottom right of the scene
+        this.shop = this.add
+            .image(this.scale.width - 60, this.scale.height - 100, "shop")
+            .setScale(0.1);
+
+        if (
+            this.goldCoin &&
+            this.goldText &&
+            this.trophy &&
+            this.trophyText &&
+            this.fight &&
+            this.shop
+        ) {
+            // Don't move with camera
+            this.goldCoin.setScrollFactor(0);
+            this.goldText.setScrollFactor(0);
+            this.trophy.setScrollFactor(0);
+            this.trophyText.setScrollFactor(0);
+            this.fight.setScrollFactor(0);
+            this.shop.setScrollFactor(0);
+
+            // Remove UI elements from the main camera
+            this.cameras.main.ignore([
+                this.goldCoin,
+                this.goldText,
+                this.trophy,
+                this.trophyText,
+                this.fight,
+                this.shop,
+            ]);
+
+            // Ensure UI camera only sees UI elements
+            this.uiCamera.ignore(this.worldContainer);
+        }
+
+        // Handle window resize to reposition UI elements
+        this.scale.on("resize", this.resizeUI, this);
+    }
+
+    resizeUI(gameSize: any) {
+        if (
+            this.goldCoin &&
+            this.goldText &&
+            this.trophy &&
+            this.trophyText &&
+            this.uiCamera &&
+            this.fight &&
+            this.shop
+        ) {
+            // Resize UI camera viewport
+            this.uiCamera.setSize(gameSize.width, gameSize.height);
+
+            // Reposition gold coin
+            this.goldCoin.setPosition(gameSize.width - 50, 50);
+
+            // Reposition gold text
+            this.goldText.setPosition(gameSize.width - 90, 50);
+
+            this.trophy.setPosition(50, 50);
+
+            this.trophyText.setPosition(80, 50);
+
+            this.fight.setPosition(60, gameSize.height - 100);
+
+            this.shop.setPosition(gameSize - 60, gameSize - 100);
+
+            // Reposition debug text if it exists
+            // if (this.debugText) {
+            //     this.debugText.setPosition(10, 10);
+            // }
+        }
     }
 
     createWorld() {
         // Create a large world for the player to navigate
-        const tileWidth = 256; // Your ground tile width
+        const tileWidth = 256;
         const tileHeight = 128;
-
         const effectiveHeight = tileHeight / 2;
 
         const tilesWidth =
             Math.ceil(this.worldSize.width / (tileWidth / 2)) + 4; // Add padding
         const tilesHeight =
             Math.ceil(this.worldSize.height / effectiveHeight) + 4; // Add padding
-        // Example: Use a repeating pattern or tilemap
 
         // Extend the world size to ensure full coverage
         this.worldSize.width = tilesWidth * (tileWidth / 2);
         this.worldSize.height = tilesHeight * effectiveHeight;
 
+        console.log(
+            "World size:",
+            this.worldSize.width,
+            "x",
+            this.worldSize.height
+        );
+
         const ground = this.add
             .tileSprite(
-                -tileWidth * 2,
-                -tileHeight * 2, // Position slightly outside the visible area
-                this.worldSize.width + tileWidth * 4,
-                this.worldSize.height + tileHeight * 4,
+                0,
+                0,
+                this.worldSize.width,
+                this.worldSize.height,
                 "ground"
             )
             .setOrigin(0)
             .setDepth(0);
+
+        this.worldContainer.add(ground);
 
         // Define world bounds for physics and camera
         this.physics.world.setBounds(
@@ -93,11 +266,58 @@ export class Game extends Scene {
             this.worldSize.width,
             this.worldSize.height
         );
+
+        // Add corner markers to help visualize the world bounds
+        this.addWorldCornerMarkers();
+    }
+
+    addWorldCornerMarkers() {
+        // Add visual markers at the corners of the world
+        const corners = [
+            { x: 0, y: 0, label: "TOP-LEFT" },
+            { x: this.worldSize.width, y: 0, label: "TOP-RIGHT" },
+            { x: 0, y: this.worldSize.height, label: "BOTTOM-LEFT" },
+            {
+                x: this.worldSize.width,
+                y: this.worldSize.height,
+                label: "BOTTOM-RIGHT",
+            },
+        ];
+
+        corners.forEach((corner) => {
+            // Create a circle marker
+            const marker = this.add.circle(
+                corner.x,
+                corner.y,
+                50,
+                0xff00ff,
+                0.7
+            );
+
+            // Add label
+            const text = this.add
+                .text(corner.x, corner.y, corner.label, {
+                    fontFamily: "Arial",
+                    fontSize: "20px",
+                    color: "#ffffff",
+                    stroke: "#000000",
+                    strokeThickness: 4,
+                })
+                .setOrigin(0.5);
+
+            this.worldContainer.add([marker, text]);
+        });
     }
 
     setupMainCamera() {
         // Get reference to main camera
         this.mainCamera = this.cameras.main;
+
+        // Configure camera to follow the world container
+        this.mainCamera.startFollow(this.worldContainer, false, 1, 1, 0, 0);
+        this.mainCamera.stopFollow(); // Stop following but keep the configuration
+
+        this.mainCamera.ignore([]); // Clear any previous ignores
 
         // Set bounds so camera won't go outside the game world
         this.mainCamera.setBounds(
@@ -113,32 +333,40 @@ export class Game extends Scene {
             this.worldSize.height / 2
         );
 
-        // Set up camera zoom limits
-        this.mainCamera.setZoom(1); // Start zoom
+        // Set initial zoom with more dramatic value to test
+        const initialZoom = 1.0;
+        this.mainCamera.setZoom(initialZoom);
 
-        // Optional: Add some lerping for smooth camera movement
+        // Use a stronger zoom effect for testing
+        this.mainCamera.zoomTo(1.5, 1000); // Zoom to 1.5x over 1 second
+        setTimeout(() => {
+            if (this.mainCamera) {
+                this.mainCamera.zoomTo(1.0, 1000); // Then back to 1.0x
+            }
+        }, 1500);
+
+        // Add some lerping for smooth camera movement
         this.mainCamera.setLerp(0.1);
 
-        // Add padding to ensure no edges are visible when zooming out
-        // This effectively restricts how far the camera can move near the edges
-        const padding = 100; // Adjust this value based on your needs
-        this.mainCamera.setViewport(
-            padding,
-            padding,
-            this.scale.width - padding * 2,
-            this.scale.height - padding * 2
-        );
+        // Debug log to check camera settings
+        console.log("Camera setup - Initial zoom:", this.mainCamera.zoom);
+        console.log("Camera bounds:", this.mainCamera.getBounds());
     }
 
     setupCameraControls() {
         // Setup pointer down for dragging
         this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-            this.isDragging = true;
-            this.lastPointerPosition = { x: pointer.x, y: pointer.y };
+            // Only start dragging if this is the main pointer (left click or first touch)
+            if (pointer.button === 0 || pointer.identifier === 0) {
+                this.isDragging = true;
+                this.lastPointerPosition = { x: pointer.x, y: pointer.y };
+                console.log("Drag started at", pointer.x, pointer.y);
+            }
         });
 
         // Setup pointer move for camera movement
         this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+            if (this.isDraggingSprite) return;
             if (!this.isDragging || !this.lastPointerPosition) return;
 
             // Calculate the distance moved
@@ -148,25 +376,73 @@ export class Game extends Scene {
             // Update camera position (invert movement to make it feel like you're grabbing the world)
             if (this.mainCamera) {
                 this.mainCamera.scrollX -= deltaX / this.mainCamera.zoom;
-            }
-            if (this.mainCamera) {
                 this.mainCamera.scrollY -= deltaY / this.mainCamera.zoom;
+                console.log(
+                    "Camera scroll:",
+                    this.mainCamera.scrollX,
+                    this.mainCamera.scrollY
+                );
             }
-
-            // Ensure camera stays within safe area to prevent seeing beyond world edges when zoomed out
-            this.constrainCamera();
 
             // Update last position
             this.lastPointerPosition = { x: pointer.x, y: pointer.y };
         });
 
         // Setup pointer up to stop dragging
-        this.input.on("pointerup", () => {
-            this.isDragging = false;
-            this.lastPointerPosition = null;
+        this.input.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+            // whenever any pointer is released, also reset sprite‑drag flag
+            this.isDraggingSprite = false;
+            if (pointer.button === 0 || pointer.identifier === 0) {
+                this.isDragging = false;
+                this.lastPointerPosition = null;
+                console.log("Drag ended");
+            }
         });
 
-        // Setup mouse wheel for zooming - similar to how Clash of Clans allows pinch-zoom
+        // Listen for Phaser drag events (for interactive sprites)
+        this.input.on(
+            "dragstart",
+            (
+                _pointer: Phaser.Input.Pointer,
+                gameObject: Phaser.GameObjects.GameObject
+            ) => {
+                this.isDraggingSprite = true;
+                console.log("Started dragging sprite", gameObject);
+            }
+        );
+
+        this.input.on(
+            "drag",
+            (
+                _pointer: Phaser.Input.Pointer,
+                gameObject: Phaser.GameObjects.GameObject & {
+                    x: number;
+                    y: number;
+                },
+                dragX: number,
+                dragY: number
+            ) => {
+                // Move the sprite inside the world container
+                gameObject.x = dragX;
+                gameObject.y = dragY;
+            }
+        );
+
+        this.input.on(
+            "dragend",
+            (
+                _pointer: Phaser.Input.Pointer,
+                gameObject: Phaser.GameObjects.GameObject & {
+                    x: number;
+                    y: number;
+                }
+            ) => {
+                console.log("Dropped sprite at", gameObject.x, gameObject.y);
+                this.isDraggingSprite = false;
+            }
+        );
+
+        // Mouse wheel zoom with enhanced sensitivity
         this.input.on(
             "wheel",
             (
@@ -175,19 +451,43 @@ export class Game extends Scene {
                 deltaX: number,
                 deltaY: number
             ) => {
-                // Calculate new zoom level
-                const zoomChange = -deltaY * 0.001; // Adjust sensitivity as needed
-                let newZoom = this.mainCamera!.zoom + zoomChange;
+                // Calculate new zoom level with enhanced sensitivity for testing
+                const zoomChange = -deltaY * 0.001;
 
-                // Clamp zoom between min and max values
-                newZoom = PhaserMath.Clamp(newZoom, 0.7, 2);
+                if (this.mainCamera) {
+                    let currentZoom = this.mainCamera.zoom;
+                    let newZoom = currentZoom + zoomChange;
 
-                // Apply new zoom centered on pointer position
-                this.zoomCameraAt(pointer, newZoom);
+                    // Clamp zoom between min and max values
+                    newZoom = Phaser.Math.Clamp(newZoom, 0.5, 2.0);
+
+                    // Debug log
+                    console.log(
+                        "Zoom wheel - Current:",
+                        currentZoom,
+                        "New:",
+                        newZoom,
+                        "Change:",
+                        zoomChange
+                    );
+
+                    // For enhanced visual feedback, use zoomTo instead of setZoom
+                    if (Math.abs(newZoom - currentZoom) > 0.01) {
+                        this.mainCamera.zoomTo(newZoom, 100); // Animate zoom over 100ms
+                    }
+
+                    // Apply center point correction
+                    this.zoomCameraAt(pointer, newZoom);
+
+                    // Update debug text
+                    // if (this.debugText) {
+                    //     this.debugText.setText(`Zoom: ${newZoom.toFixed(2)}`);
+                    // }
+                }
             }
         );
 
-        // For mobile: pinch to zoom
+        // For mobile: pinch to zoom with enhanced sensitivity
         this.input.addPointer(1); // Ensure we can track 2 pointers for pinch
 
         let prevDistance = 0;
@@ -209,24 +509,95 @@ export class Game extends Scene {
                 // If we have a previous distance, calculate zoom
                 if (prevDistance > 0) {
                     const distanceChange = distance - prevDistance;
-                    const zoomChange = distanceChange * 0.002; // Adjust sensitivity
-                    let newZoom = this.mainCamera!.zoom + zoomChange;
+                    const zoomChange = distanceChange * 0.001;
 
-                    // Clamp zoom between min and max
-                    newZoom = PhaserMath.Clamp(newZoom, 0.5, 2);
+                    if (this.mainCamera) {
+                        let currentZoom = this.mainCamera.zoom;
+                        let newZoom = currentZoom + zoomChange;
 
-                    // Find center point between fingers for zoom center
-                    const centerX = (p1.x + p2.x) / 2;
-                    const centerY = (p1.y + p2.y) / 2;
-                    const centerPointer = { x: centerX, y: centerY };
+                        // Clamp zoom between min and max
+                        newZoom = Phaser.Math.Clamp(newZoom, 0.5, 2.0);
 
-                    // Apply zoom
-                    this.zoomCameraAt(centerPointer, newZoom);
+                        // Find center point between fingers for zoom center
+                        const centerX = (p1.x + p2.x) / 2;
+                        const centerY = (p1.y + p2.y) / 2;
+                        const centerPointer = { x: centerX, y: centerY };
+
+                        // Debug log
+                        console.log(
+                            "Pinch zoom - Current:",
+                            currentZoom,
+                            "New:",
+                            newZoom,
+                            "Change:",
+                            zoomChange
+                        );
+
+                        // For enhanced visual feedback, use zoomTo
+                        if (Math.abs(newZoom - currentZoom) > 0.01) {
+                            this.mainCamera.zoomTo(newZoom, 100);
+                        }
+
+                        // Apply center point correction
+                        this.zoomCameraAt(centerPointer, newZoom);
+
+                        // Update debug text
+                        // if (this.debugText) {
+                        //     this.debugText.setText(
+                        //         `Zoom: ${newZoom.toFixed(2)}`
+                        //     );
+                        // }
+                    }
                 }
 
                 prevDistance = distance;
             } else {
                 prevDistance = 0;
+            }
+        });
+
+        // Add keyboard controls for testing zoom
+        this.input.keyboard?.on("keydown-PLUS", () => {
+            if (this.mainCamera) {
+                let newZoom = Phaser.Math.Clamp(
+                    this.mainCamera.zoom + 0.1,
+                    0.5,
+                    2.0
+                );
+                console.log("Keyboard zoom in:", newZoom);
+                this.mainCamera.zoomTo(newZoom, 200);
+
+                // if (this.debugText) {
+                //     this.debugText.setText(`Zoom: ${newZoom.toFixed(2)}`);
+                // }
+            }
+        });
+
+        this.input.keyboard?.on("keydown-MINUS", () => {
+            if (this.mainCamera) {
+                let newZoom = Phaser.Math.Clamp(
+                    this.mainCamera.zoom - 0.1,
+                    0.5,
+                    2.0
+                );
+                console.log("Keyboard zoom out:", newZoom);
+                this.mainCamera.zoomTo(newZoom, 200);
+
+                // if (this.debugText) {
+                //     this.debugText.setText(`Zoom: ${newZoom.toFixed(2)}`);
+                // }
+            }
+        });
+
+        // Space key to reset zoom
+        this.input.keyboard?.on("keydown-SPACE", () => {
+            if (this.mainCamera) {
+                console.log("Reset zoom to 1.0");
+                this.mainCamera.zoomTo(1.0, 300);
+
+                // if (this.debugText) {
+                //     this.debugText.setText("Zoom: 1.00");
+                // }
             }
         });
     }
@@ -238,8 +609,11 @@ export class Game extends Scene {
         // Get the world position before zoom change
         const worldPoint = this.mainCamera.getWorldPoint(pointer.x, pointer.y);
 
-        // Change the zoom
+        // Set the new zoom level directly
         this.mainCamera.setZoom(zoom);
+
+        // Log the actual zoom after setting
+        console.log("zoomCameraAt - Applied zoom:", this.mainCamera.zoom);
 
         // Get the new screen position after zoom
         const newWorldPoint = this.mainCamera.getWorldPoint(
@@ -251,14 +625,15 @@ export class Game extends Scene {
         this.mainCamera.scrollX += worldPoint.x - newWorldPoint.x;
         this.mainCamera.scrollY += worldPoint.y - newWorldPoint.y;
 
-        // Ensure camera stays within safe area to prevent seeing beyond world edges
+        // Call constrainCamera AFTER applying the zoom and position changes
         this.constrainCamera();
     }
+
     // This method ensures the camera doesn't show areas beyond the world bounds
     constrainCamera() {
         if (!this.mainCamera) return;
 
-        // Calculate the visible area in world coordinates
+        // Calculate the visible area in world coordinates based on current zoom
         const visibleWidth = this.cameras.main.width / this.mainCamera.zoom;
         const visibleHeight = this.cameras.main.height / this.mainCamera.zoom;
 
@@ -269,112 +644,42 @@ export class Game extends Scene {
         const maxY = this.worldSize.height - visibleHeight / 2;
 
         // Calculate the camera's current center point
-        const cameraCenterX =
-            this.mainCamera.scrollX +
-            this.cameras.main.width / 2 / this.mainCamera.zoom;
-        const cameraCenterY =
-            this.mainCamera.scrollY +
-            this.cameras.main.height / 2 / this.mainCamera.zoom;
+        const cameraCenterX = this.mainCamera.scrollX + visibleWidth / 2;
+        const cameraCenterY = this.mainCamera.scrollY + visibleHeight / 2;
 
         // Constrain the camera center within the safe boundaries
         const constrainedX = Phaser.Math.Clamp(cameraCenterX, minX, maxX);
         const constrainedY = Phaser.Math.Clamp(cameraCenterY, minY, maxY);
 
         // Update camera scroll position to center on the constrained position
-        this.mainCamera.scrollX =
-            constrainedX - this.cameras.main.width / 2 / this.mainCamera.zoom;
-        this.mainCamera.scrollY =
-            constrainedY - this.cameras.main.height / 2 / this.mainCamera.zoom;
+        this.mainCamera.scrollX = constrainedX - visibleWidth / 2;
+        this.mainCamera.scrollY = constrainedY - visibleHeight / 2;
     }
 
-    setupMinimap() {
-        // Create a minimap in top-right corner (like in Clash of Clans)
-        const minimapWidth = 150;
-        const minimapHeight = 150;
-        const minimapX = this.scale.width - minimapWidth - 20;
-        const minimapY = 20;
+    // Creates a placeable image/sprite that the user can drag around.
+    private createPlaceable(cfg: {
+        key: string;
+        x: number;
+        y: number;
+        scale?: number;
+    }) {
+        const img = this.add
+            .image(cfg.x, cfg.y, cfg.key)
+            .setOrigin(0.5)
+            .setScale(cfg.scale ?? 1)
+            .setInteractive({ draggable: true });
 
-        // Create minimap background
-        this.add
-            .rectangle(
-                minimapX,
-                minimapY,
-                minimapWidth,
-                minimapHeight,
-                0x000000,
-                0.5
-            )
-            .setOrigin(0)
-            .setScrollFactor(0)
-            .setDepth(10);
+        // ensure it lives in the worldContainer so camera pans/zooms affect it
+        this.worldContainer.add(img);
 
-        // Create secondary camera for minimap
-        this.minimapCamera = this.cameras
-            .add(minimapX, minimapY, minimapWidth, minimapHeight)
-            .setZoom(minimapWidth / this.worldSize.width)
-            .setScroll(0, 0)
-            .setBounds(0, 0, this.worldSize.width, this.worldSize.height)
-            .setBackgroundColor(0x002244)
-            .setName("minimap");
-
-        // Create a visible rectangle on minimap showing current view
-        const viewportRect = this.add
-            .rectangle(0, 0, 1, 1, 0xffffff, 0.3)
-            .setStrokeStyle(1, 0xffffff)
-            .setDepth(11);
-
-        // Make the minimap ignore the viewport rectangle
-        this.minimapCamera.ignore(viewportRect);
+        //  emit an event when clicked
+        img.on("pointerdown", () => {
+            this.events.emit("building-selected", img);
+        });
     }
 
     update() {
-        // Update the viewport rectangle on the minimap if we have one
-        if (this.minimapCamera && this.mainCamera) {
-            // Calculate screen-to-world ratio for minimap
-            const minimapZoom = this.minimapCamera.zoom;
-
-            // Calculate visible rectangle size
-            const visibleWorldWidth =
-                this.mainCamera.width / this.mainCamera.zoom;
-            const visibleWorldHeight =
-                this.mainCamera.height / this.mainCamera.zoom;
-            const visibleMinimapWidth = visibleWorldWidth * minimapZoom;
-            const visibleMinimapHeight = visibleWorldHeight * minimapZoom;
-
-            // Find all objects with 'minimap-viewport' name
-            const viewportRect = this.children
-                .getChildren()
-                .find(
-                    (child) => child.name === "minimap-viewport"
-                ) as Phaser.GameObjects.Rectangle;
-
-            if (viewportRect) {
-                // Position and resize the rectangle based on camera position
-                viewportRect.setPosition(
-                    this.mainCamera.scrollX * minimapZoom +
-                        this.minimapCamera.x,
-                    this.mainCamera.scrollY * minimapZoom + this.minimapCamera.y
-                );
-                viewportRect.setSize(visibleMinimapWidth, visibleMinimapHeight);
-            } else {
-                // Create the viewport rectangle if it doesn't exist
-                this.add
-                    .rectangle(
-                        this.mainCamera.scrollX * minimapZoom +
-                            this.minimapCamera.x,
-                        this.mainCamera.scrollY * minimapZoom +
-                            this.minimapCamera.y,
-                        visibleMinimapWidth,
-                        visibleMinimapHeight,
-                        0xffffff,
-                        0.3
-                    )
-                    .setStrokeStyle(1, 0xffffff)
-                    .setDepth(11)
-                    .setScrollFactor(0)
-                    .setName("minimap-viewport");
-            }
-        }
+        // Ensure camera stays within bounds during updates
         this.constrainCamera();
     }
 }
