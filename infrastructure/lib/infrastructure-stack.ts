@@ -41,7 +41,14 @@ export class InfrastructureStack extends cdk.Stack {
       userPoolName: process.env.USER_POOL_NAME,
       selfSignUpEnabled: true, // Allow users to sign up
       autoVerify: { email: true }, // Automatically verify email
-      signInAliases: { email: true }, // Allow sign-in with email
+      signInAliases: { email: true, username: true }, // Allow sign-in with email
+      standardAttributes: {
+        preferredUsername: {
+          required: true,
+          mutable: false,
+        },
+      },
+
       passwordPolicy: {
         minLength: 8,
         requireDigits: true,
@@ -117,6 +124,7 @@ export class InfrastructureStack extends cdk.Stack {
         handler: "handler",
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
+          CACHE_NAME: process.env.CACHE_NAME!,
         },
         bundling: {
           externalModules: ["aws-lambda"],
@@ -131,6 +139,31 @@ export class InfrastructureStack extends cdk.Stack {
       cognito.UserPoolOperation.POST_CONFIRMATION,
       postConfirmationFunction
     );
+
+    // Get player Gold and Trophy
+    const getPlayerProfileFn = new lambdaNodejs.NodejsFunction(
+      this,
+      "GetPlayerProfileFunction",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/players/getProfile.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          GAME_TABLE_NAME: gameTable.tableName,
+          CACHE_NAME: process.env.CACHE_NAME!,
+        },
+      }
+    );
+
+    gameTable.grantReadData(getPlayerProfileFn);
 
     // Create a Lambda function for creating a plant
     const createPlantFunction = new lambdaNodejs.NodejsFunction(
@@ -225,7 +258,7 @@ export class InfrastructureStack extends cdk.Stack {
           GAME_TABLE_NAME: gameTable.tableName,
           SECRET_ARN: momentoApiKeySecret.secretArn,
           SECRET_NAME: "clash-of-farms/momento-api-key",
-          CACHE_NAME: "clash-of-farms-cache",
+          CACHE_NAME: process.env.CACHE_NAME!,
           DEBUG: "true",
         },
       }
@@ -470,6 +503,18 @@ export class InfrastructureStack extends cdk.Stack {
       "ClashOfFarmsAuthorizer",
       {
         cognitoUserPools: [userPool],
+      }
+    );
+
+    // get player profile endpoint
+    const players = api.root.addResource("players");
+    const playerProfile = players.addResource("{playerId}");
+    playerProfile.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(getPlayerProfileFn),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
       }
     );
 
