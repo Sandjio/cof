@@ -6,12 +6,7 @@ import {
   CredentialProvider,
   Configurations,
 } from "@gomomento/sdk";
-import {
-  SecretsManagerClient,
-  GetSecretValueCommand,
-} from "@aws-sdk/client-secrets-manager";
 import { getMomentoApiKey } from "shared/src/lib/getAuthToken";
-import { config } from "dotenv";
 
 // Environment Variable
 const GAME_TABLE_NAME = process.env.GAME_TABLE_NAME!;
@@ -19,7 +14,7 @@ const CACHE_NAME = process.env.CACHE_NAME!;
 
 export const handler: PostConfirmationTriggerHandler = async (event) => {
   const { userName, request } = event;
-  const preferredUsername = request.userAttributes.preferredUsername;
+  const preferredUsername = request.userAttributes.preferred_username;
 
   // Create player profile
   const playerProfile = {
