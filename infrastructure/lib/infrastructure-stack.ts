@@ -41,7 +41,7 @@ export class InfrastructureStack extends cdk.Stack {
       userPoolName: process.env.USER_POOL_NAME,
       selfSignUpEnabled: true, // Allow users to sign up
       autoVerify: { email: true }, // Automatically verify email
-      signInAliases: { email: true, username: true }, // Allow sign-in with email
+      signInAliases: { email: true }, // Allow sign-in with email
       standardAttributes: {
         preferredUsername: {
           required: true,
@@ -125,6 +125,7 @@ export class InfrastructureStack extends cdk.Stack {
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
           CACHE_NAME: process.env.CACHE_NAME!,
+          SECRET_ARN: momentoApiKeySecret.secretArn,
         },
         bundling: {
           externalModules: ["aws-lambda"],
@@ -134,6 +135,8 @@ export class InfrastructureStack extends cdk.Stack {
     );
 
     gameTable.grantWriteData(postConfirmationFunction);
+
+    momentoApiKeySecret.grantRead(postConfirmationFunction);
 
     userPool.addTrigger(
       cognito.UserPoolOperation.POST_CONFIRMATION,
@@ -159,11 +162,13 @@ export class InfrastructureStack extends cdk.Stack {
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
           CACHE_NAME: process.env.CACHE_NAME!,
+          SECRET_ARN: momentoApiKeySecret.secretArn,
         },
       }
     );
 
     gameTable.grantReadData(getPlayerProfileFn);
+    momentoApiKeySecret.grantRead(getPlayerProfileFn);
 
     // Create a Lambda function for creating a plant
     const createPlantFunction = new lambdaNodejs.NodejsFunction(
