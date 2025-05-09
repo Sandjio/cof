@@ -1,20 +1,33 @@
 import { PostConfirmationTriggerHandler } from "aws-lambda";
 import { docClient } from "../../../../shared/src/lib/dynamoClient";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  CacheClient,
+  CredentialProvider,
+  Configurations,
+} from "@gomomento/sdk";
+import {
+  SecretsManagerClient,
+  GetSecretValueCommand,
+} from "@aws-sdk/client-secrets-manager";
+import { getMomentoApiKey } from "shared/src/lib/getAuthToken";
+import { config } from "dotenv";
 
 // Environment Variable
 const GAME_TABLE_NAME = process.env.GAME_TABLE_NAME!;
+const CACHE_NAME = process.env.CACHE_NAME!;
 
 export const handler: PostConfirmationTriggerHandler = async (event) => {
   const { userName, request } = event;
-  const email = request.userAttributes.email;
+  const preferredUsername = request.userAttributes.preferredUsername;
 
   // Create player profile
   const playerProfile = {
     PK: `PLAYER#${userName}`,
     SK: "PROFILE#",
-    email,
-    gold: 1000, // Starting gold
+    preferredUsername,
+    gold: 1000,
+    trophy: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -27,8 +40,28 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
     })
   );
 
-  // Use a sanitized version of the email for logging
-  console.log(`Player profile created for ${email.replace(/[\r\n]/g, "")}`);
+  const apiKey = await getMomentoApiKey();
+  const credProvider = CredentialProvider.fromString(apiKey);
+  const client = new CacheClient({
+    configuration: Configurations.Lambda.latest(),
+    credentialProvider: credProvider,
+    defaultTtlSeconds: 60 * 60 * 24,
+  });
+
+  const result = await client.dictionarySetFields(
+    CACHE_NAME,
+    preferredUsername,
+    new Map<string, string>([
+      ["gold", playerProfile.gold.toString()],
+      ["trophy", playerProfile.trophy.toString()],
+    ])
+  );
+
+  if (!result) {
+    console.log("Cache Client send");
+  }
+
+  console.log(`Player profile created for ${preferredUsername}`);
 
   return event;
 };
