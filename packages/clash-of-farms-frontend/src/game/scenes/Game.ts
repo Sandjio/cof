@@ -154,7 +154,11 @@ export class Game extends Scene {
         // Add the shop icon at the bottom right of the scene
         this.shop = this.add
             .image(this.scale.width - 60, this.scale.height - 100, "shop")
-            .setScale(0.1);
+            .setScale(0.1)
+            .setInteractive({ useHandCursor: true })
+            .on("pointerdown", () => {
+                this.scene.start("Shop");
+            });
 
         if (
             this.goldCoin &&
