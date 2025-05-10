@@ -1,13 +1,16 @@
 import { Scene, GameObjects } from "phaser";
 import { EventBus } from "../EventBus";
-import { channel } from "diagnostics_channel";
+import { AuthService } from "@/services/AuthService";
 
 export class MainMenu extends Scene {
     private background: GameObjects.Image;
+    private logoutButton: GameObjects.Text;
+    private authService: AuthService;
     // private backgroundMusic: Phaser.Sound.BaseSound;
 
     constructor() {
         super("MainMenu");
+        this.authService = AuthService.getInstance();
     }
 
     create() {
@@ -20,30 +23,24 @@ export class MainMenu extends Scene {
         // });
         // music.play();
 
-        const loginUrl = `${process.env.NEXT_PUBLIC_COGNITO_DOMAIN}/login?client_id=${process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID}&response_type=code&scope=email+openid+profile&redirect_uri=${process.env.NEXT_PUBLIC_REDIRECT_URI}`;
-
         const centerX = this.cameras.main.width / 2;
         const centerY = this.cameras.main.height / 2;
 
-        const loginText = this.add
-            .text(centerX, centerY, "Login to Play", {
-                fontSize: "32px",
+        // Logout button
+        this.logoutButton = this.add
+            .text(centerX, centerY + 50, "Logout", {
+                fontSize: "24px",
                 color: "#ffffff",
                 backgroundColor: "#000000aa",
                 padding: { x: 12, y: 6 },
             })
             .setOrigin(0.5)
-            .setInteractive();
+            .setInteractive({ useHandCursor: true });
 
-        loginText.on("pointerdown", () => {
-            // if (!this.backgroundMusic || !this.backgroundMusic.isPlaying) {
-            //     this.backgroundMusic = this.sound.add("backgroundMusic", {
-            //         loop: true,
-            //         volume: 0.5,
-            //     });
-            //     this.backgroundMusic.play();
-            // }
-            window.location.href = loginUrl;
+        this.logoutButton.on("pointerdown", () => {
+            this.authService.logout();
+            // Use window.location to redirect to home page
+            window.location.href = "/";
         });
 
         this.scale.on("resize", this.resize, this);
