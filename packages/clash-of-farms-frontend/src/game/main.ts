@@ -5,30 +5,36 @@ import { Preloader } from "./scenes/Preloader";
 import { MainMenu } from "./scenes/MainMenu";
 import { Shop } from "./scenes/Shop";
 
-//  Find out more information about the Game Config at:
-//  https://newdocs.phaser.io/docs/3.70.0/Phaser.Types.Core.GameConfig
-const config: Phaser.Types.Core.GameConfig = {
-    type: AUTO,
-    width: window.innerWidth,
-    height: window.innerHeight,
-    parent: "game-container",
-    backgroundColor: "#028af8",
-    scene: [Boot, Preloader, MainMenu, MainGame, Shop],
-    scale: {
-        mode: Scale.RESIZE,
-        autoCenter: Scale.CENTER_BOTH,
-    },
-    physics: {
-        default: "arcade",
-        arcade: {
-            debug: false,
+declare global {
+    interface Window {
+        game?: Phaser.Game;
+    }
+}
+
+export const StartGame = (parent: string) => {
+    // Destroy any existing game instance
+    if (window.game) {
+        window.game.destroy(true);
+    }
+    const config: Phaser.Types.Core.GameConfig = {
+        type: AUTO,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        parent: "game-container",
+        backgroundColor: "#028af8",
+        scene: [Boot, Preloader, MainMenu, MainGame, Shop],
+        scale: {
+            mode: Scale.RESIZE,
+            autoCenter: Scale.CENTER_BOTH,
         },
-    },
+        physics: {
+            default: "arcade",
+            arcade: {
+                debug: false,
+            },
+        },
+    };
+    window.game = new Game({ ...config, parent });
+    return window.game;
 };
-
-const StartGame = (parent: string) => {
-    return new Game({ ...config, parent });
-};
-
-export default StartGame;
 
