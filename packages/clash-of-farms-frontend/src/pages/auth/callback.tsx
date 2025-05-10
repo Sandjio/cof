@@ -1,51 +1,80 @@
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
-import axios from "axios";
+import { AuthService } from "@/services/AuthService";
 
-const CallbackPage = () => {
+// This component handles the Cognito callback
+export default function CognitoCallback() {
     const router = useRouter();
+    const [status, setStatus] = useState("Processing authentication...");
 
     useEffect(() => {
-        const exchangeCode = async () => {
-            const code = router.query.code as string;
-            if (!code) return;
+        // Only run this code when the component is mounted and the router is ready
+        if (!router.isReady) return;
 
-            const body = new URLSearchParams();
-            body.append("grant_type", "authorization_code");
-            body.append(
-                "client_id",
-                process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID!
-            );
-            body.append("code", code);
-            body.append("redirect_uri", process.env.NEXT_PUBLIC_REDIRECT_URI!);
-
+        async function handleAuthCode() {
             try {
-                const response = await axios.post(
-                    `${process.env.NEXT_PUBLIC_COGNITO_DOMAIN}/oauth2/token`,
-                    body,
-                    {
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded",
-                        },
-                    }
-                );
+                const { code } = router.query;
 
-                const { id_token, access_token } = response.data;
+                // Make sure we have a code
+                if (!code || Array.isArray(code)) {
+                    setStatus("Invalid authentication code.");
+                    return;
+                }
 
-                localStorage.setItem("id_token", id_token);
-                localStorage.setItem("access_token", access_token);
+                // Get auth service instance
+                const authService = AuthService.getInstance();
 
-                router.push("/"); // route protégée vers le jeu
-            } catch (err) {
-                console.error("Token exchange failed", err);
+                // Exchange the code for tokens
+                setStatus("Exchanging code for tokens...");
+                const success = await authService.exchangeCodeForTokens(code);
+
+                if (success) {
+                    setStatus("Authentication successful! Redirecting...");
+
+                    // Redirect to the game page after a short delay
+                    setTimeout(() => {
+                        router.push("/game");
+                    }, 1000);
+                } else {
+                    setStatus("Authentication failed. Please try again.");
+
+                    // Redirect to home page after a short delay
+                    setTimeout(() => {
+                        router.push("/");
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error("Authentication error:", error);
+                setStatus("Authentication error. Redirecting to home...");
+
+                setTimeout(() => {
+                    router.push("/");
+                }, 2000);
             }
-        };
+        }
 
-        exchangeCode();
-    }, [router]);
+        handleAuthCode();
+    }, [router.isReady, router.query]);
 
-    return <p>Loading...</p>;
-};
-
-export default CallbackPage;
+    return (
+        <div
+            className="auth-callback-container"
+            style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "100vh",
+                backgroundColor: "#000",
+                color: "#fff",
+                textAlign: "center",
+                fontFamily: "Arial, sans-serif",
+            }}
+        >
+            <div>
+                <h1>Authentication</h1>
+                <p>{status}</p>
+            </div>
+        </div>
+    );
+}
 
