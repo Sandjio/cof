@@ -1,4 +1,5 @@
-// src/services/AuthService.ts
+import jwtDecode from "jwt-decode";
+
 export class AuthService {
     private static instance: AuthService;
     private tokens: {
@@ -136,4 +137,23 @@ export class AuthService {
             localStorage.removeItem("auth_tokens");
         }
     }
+
+    public getUserFromIdToken() {
+        const idToken = this.getIdToken();
+        if (!idToken) {
+            throw new Error("ID Token is null or undefined");
+        }
+        const decoded = jwtDecode<{
+            email: string;
+            sub: string;
+            preferred_username: string;
+        }>(idToken);
+
+        return {
+            email: decoded.email,
+            userId: decoded.sub,
+            username: decoded.preferred_username,
+        };
+    }
 }
+
