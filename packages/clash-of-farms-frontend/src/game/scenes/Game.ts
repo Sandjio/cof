@@ -136,22 +136,17 @@ export class Game extends Scene {
 
         // Add a text to show gold count
         this.goldText = this.add
-            .text(
-                this.scale.width - 90,
-                50,
-                gold.toString(), // Initial gold amount
-                {
-                    fontFamily: "Arial",
-                    fontSize: "24px",
-                    color: "#FFD700",
-                }
-            )
+            .text(this.scale.width - 90, 50, `${gold}`, {
+                fontFamily: "Arial",
+                fontSize: "24px",
+                color: "#FFD700",
+            })
             .setOrigin(1, 0.5);
 
         // Add trophy image to the top left of the scene
         this.trophy = this.add.image(50, 50, "trophy").setScale(0.2);
         this.trophyText = this.add
-            .text(80, 50, trophy.toString(), {
+            .text(80, 50, `${trophy}`, {
                 fontFamily: "Arial",
                 fontSize: "24px",
                 color: "#FFD700",
@@ -169,7 +164,7 @@ export class Game extends Scene {
             .setScale(0.1)
             .setInteractive({ useHandCursor: true })
             .on("pointerdown", () => {
-                this.scene.start("Shop");
+                this.scene.start("Shop", { gold: data.gold });
             });
 
         if (
