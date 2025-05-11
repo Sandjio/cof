@@ -47,11 +47,8 @@ export default function GamePage() {
     return (
         <>
             <Head>
-                <title>My Phaser Game</title>
-                <meta
-                    name="description"
-                    content="Play my awesome Phaser game"
-                />
+                <title>CLASH OF FARMS</title>
+                <meta name="description" content="Play Clash of Farms" />
             </Head>
 
             <div

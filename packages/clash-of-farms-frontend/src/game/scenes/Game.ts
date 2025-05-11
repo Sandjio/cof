@@ -2,6 +2,8 @@ import { GameObjects, Scene, Math as PhaserMath } from "phaser";
 import { EventBus } from "../EventBus";
 
 export class Game extends Scene {
+    private initData: { gold: number; trophy: number };
+
     // Camera control properties
     private isDragging: boolean = false;
     private lastPointerPosition: { x: number; y: number } | null = null;
@@ -40,8 +42,15 @@ export class Game extends Scene {
     constructor() {
         super("Game");
     }
-
+    init(data: any) {
+        this.initData = data;
+    }
     create() {
+        // const data = this.initData;
+        // console.log(`Here is the :${data}`);
+        // const { gold, trophy } = data;
+        // console.log(`Here is the gold: ${gold} and trophy: ${trophy}`);
+
         // Initialize the world container first
         this.worldContainer = this.add.container(0, 0);
 
@@ -102,6 +111,9 @@ export class Game extends Scene {
     }
 
     setupUICamera() {
+        const data = this.initData;
+        const { gold, trophy } = data;
+
         // Create a separate camera for UI elements
         this.uiCamera = this.cameras.add(
             0,
@@ -127,7 +139,7 @@ export class Game extends Scene {
             .text(
                 this.scale.width - 90,
                 50,
-                "1000", // Initial gold amount
+                gold.toString(), // Initial gold amount
                 {
                     fontFamily: "Arial",
                     fontSize: "24px",
@@ -139,7 +151,7 @@ export class Game extends Scene {
         // Add trophy image to the top left of the scene
         this.trophy = this.add.image(50, 50, "trophy").setScale(0.2);
         this.trophyText = this.add
-            .text(80, 50, "0", {
+            .text(80, 50, trophy.toString(), {
                 fontFamily: "Arial",
                 fontSize: "24px",
                 color: "#FFD700",
@@ -219,7 +231,7 @@ export class Game extends Scene {
 
             this.fight.setPosition(60, gameSize.height - 100);
 
-            this.shop.setPosition(gameSize - 60, gameSize - 100);
+            this.shop.setPosition(gameSize.width - 60, gameSize.height - 100);
 
             // Reposition debug text if it exists
             // if (this.debugText) {
