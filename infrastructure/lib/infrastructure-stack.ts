@@ -497,7 +497,13 @@ export class InfrastructureStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS, // Allow all origins for development
         allowMethods: apigateway.Cors.ALL_METHODS, // Allow all methods
-        allowHeaders: ["Content-Type", "Authorization"], // Allow specific headers
+        allowHeaders: [
+          "Content-Type",
+          "Authorization",
+          "X-Amz-Date",
+          "X-Api-Key",
+          "X-Amz-Security-Token",
+        ],
       },
       deployOptions: {
         stageName: "dev",

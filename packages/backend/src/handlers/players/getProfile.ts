@@ -9,6 +9,7 @@ import {
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { getMomentoApiKey } from "shared/src/lib/getAuthToken";
 import { momentoTtl } from "shared/src/lib/defaultMomentoTtl";
+import { headers } from "src/services/headers";
 
 const CACHE_NAME = process.env.CACHE_NAME!;
 const GAME_TABLE_NAME = process.env.GAME_TABLE_NAME!;
@@ -44,6 +45,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     if (cacheResp.type === CacheDictionaryGetFieldsResponse.Hit) {
       return {
         statusCode: 200,
+        headers,
         body: JSON.stringify(Object.fromEntries(cacheResp.valueMap())),
       };
     }
@@ -63,7 +65,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       !getResult.Item.gold === undefined ||
       !getResult.Item.trophy === undefined
     ) {
-      return { statusCode: 404, body: "Not found or incomplete data" };
+      return { statusCode: 404, headers, body: "Not found or incomplete data" };
     }
 
     // Populate the catch for next time
@@ -78,7 +80,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify(getResult.Item),
+      headers,
+      body: JSON.stringify({
+        gold: getResult.Item.gold,
+        trophy: getResult.Item.trophy,
+      }),
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -88,6 +94,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({ message: "Internal Server Error" }),
     };
   }
