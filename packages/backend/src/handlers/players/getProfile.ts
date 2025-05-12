@@ -15,12 +15,25 @@ const CACHE_NAME = process.env.CACHE_NAME!;
 const GAME_TABLE_NAME = process.env.GAME_TABLE_NAME!;
 
 export const handler: APIGatewayProxyHandler = async (event) => {
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "http://localhost:8080",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "OPTIONS,GET,POST,PUT,DELETE",
+        "Access-Control-Allow-Credentials": "true",
+      },
+      body: "",
+    };
+  }
   const playerId = event.pathParameters?.playerId;
   const username = event.queryStringParameters?.username;
 
   if (!playerId || !username) {
     return {
       statusCode: 400,
+      headers,
       body: "Missing path parameter playerId and username in the body",
     };
   }
