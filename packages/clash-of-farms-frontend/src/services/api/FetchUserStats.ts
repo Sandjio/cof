@@ -23,7 +23,7 @@ export const fetchPlayerStats = async () => {
         const response = await fetch(endpoint, {
             method: "GET",
             headers: {
-                Authorization: idToken,
+                Authorization: `Bearer ${idToken}`,
                 "Content-Type": "application/json",
             },
         });
