@@ -495,7 +495,7 @@ export class InfrastructureStack extends cdk.Stack {
       restApiName: "Clash Of Farms Api",
       description: "API for Clash of Farms game",
       defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS, // Allow all origins for development
+        allowOrigins: ["http://localhost:8080"],
         allowMethods: apigateway.Cors.ALL_METHODS, // Allow all methods
         allowHeaders: [
           "Content-Type",
@@ -504,6 +504,7 @@ export class InfrastructureStack extends cdk.Stack {
           "X-Api-Key",
           "X-Amz-Security-Token",
         ],
+        allowCredentials: true,
       },
       deployOptions: {
         stageName: "dev",
