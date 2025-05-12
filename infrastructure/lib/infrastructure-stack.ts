@@ -208,6 +208,8 @@ export class InfrastructureStack extends cdk.Stack {
         ),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
+          CACHE_NAME: process.env.CACHE_NAME!,
+          SECRET_ARN: momentoApiKeySecret.secretArn,
         },
         bundling: {
           externalModules: ["aws-lambda"],
@@ -217,6 +219,7 @@ export class InfrastructureStack extends cdk.Stack {
     );
 
     gameTable.grantReadWriteData(createPlantFunction);
+    momentoApiKeySecret.grantRead(createPlantFunction);
 
     // Create a Lambda function for creating a defense troop
     const createDefenseTroopFunction = new lambdaNodejs.NodejsFunction(
@@ -232,6 +235,8 @@ export class InfrastructureStack extends cdk.Stack {
         ),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
+          CACHE_NAME: process.env.CACHE_NAME!,
+          SECRET_ARN: momentoApiKeySecret.secretArn,
         },
         bundling: {
           externalModules: ["aws-lambda"],
@@ -239,7 +244,9 @@ export class InfrastructureStack extends cdk.Stack {
         projectRoot: path.join(__dirname, "../.."),
       }
     );
+
     gameTable.grantReadWriteData(createDefenseTroopFunction);
+    momentoApiKeySecret.grantRead(createDefenseTroopFunction);
 
     // Create a Lambda function for planting a seed
     const plantSeedFn = new lambdaNodejs.NodejsFunction(
@@ -294,7 +301,6 @@ export class InfrastructureStack extends cdk.Stack {
     );
 
     gameTable.grantReadWriteData(startBattleFunction);
-
     momentoApiKeySecret.grantRead(startBattleFunction);
 
     const getPlantsFn = new lambdaNodejs.NodejsFunction(
@@ -360,11 +366,14 @@ export class InfrastructureStack extends cdk.Stack {
         projectRoot: path.join(__dirname, "../.."),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
+          SECRET_ARN: momentoApiKeySecret.secretArn,
+          CACHE_NAME: process.env.CACHE_NAME!,
         },
       }
     );
 
     gameTable.grantReadWriteData(createAttackTroopFn);
+    momentoApiKeySecret.grantRead(createAttackTroopFn);
 
     const getAttackTroopsFn = new lambdaNodejs.NodejsFunction(
       this,

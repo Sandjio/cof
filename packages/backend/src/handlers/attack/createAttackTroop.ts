@@ -1,13 +1,36 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
+import {
+  CacheClient,
+  Configurations,
+  CredentialProvider,
+} from "@gomomento/sdk";
+
 import { docClient } from "shared/src/lib/dynamoClient";
+import { getMomentoApiKey } from "shared/src/lib/getAuthToken";
+import { momentoTtl } from "shared/src/lib/defaultMomentoTtl";
+import { headers } from "src/services/headers";
 
 const GAME_TABLE_NAME = process.env.GAME_TABLE_NAME!;
+const CACHE_NAME = process.env.CACHE_NAME!;
 
 export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "http://localhost:8080",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "OPTIONS,GET,POST,PUT,DELETE",
+        "Access-Control-Allow-Credentials": "true",
+      },
+      body: "",
+    };
+  }
+
   try {
     const body = JSON.parse(event.body || "{}");
     const { name, type, cost, playerId } = body;
@@ -15,6 +38,7 @@ export const handler = async (
     if (!name || !cost || !playerId) {
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({
           message: "Name, cost, and playerId are required.",
         }),
@@ -33,6 +57,7 @@ export const handler = async (
     if (!player) {
       return {
         statusCode: 404,
+        headers,
         body: JSON.stringify({ message: "Player not found." }),
       };
     }
@@ -41,6 +66,7 @@ export const handler = async (
     if (player.gold < cost) {
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({
           message: "Not enough gold to buy this Attack Troop.",
         }),
@@ -90,8 +116,28 @@ export const handler = async (
         ],
       })
     );
+
+    // get Momento API key & client
+    const apiKey = await getMomentoApiKey();
+    const credProvider = CredentialProvider.fromString(apiKey);
+
+    const cacheClient = new CacheClient({
+      configuration: Configurations.Lambda.latest(),
+      credentialProvider: credProvider,
+      defaultTtlSeconds: momentoTtl,
+    });
+
+    // Update the value in the cache
+    await cacheClient.dictionaryIncrement(
+      CACHE_NAME,
+      player.preferredUsername,
+      "gold",
+      -cost
+    );
+
     return {
       statusCode: 201,
+      headers,
       body: JSON.stringify({
         message: "Attack Troop created successfully.",
         attackTroop: AttackTroopItem,
@@ -102,6 +148,7 @@ export const handler = async (
     console.error("Error creating attack troop:", error);
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({
         message: "Failed to create attack troop.",
       }),
