@@ -1,9 +1,8 @@
 import {
   AuthClient,
   CredentialProvider,
-  PermissionScopes,
   ExpiresIn,
-  AllTopics,
+  AllDataReadWrite,
 } from "@gomomento/sdk";
 import { APIGatewayProxyHandler } from "aws-lambda";
 import { getMomentoApiKey } from "shared/src/lib/getAuthToken";
@@ -12,6 +11,18 @@ import { headers } from "src/services/headers";
 const topicName = process.env.TOPIC_NAME;
 
 export const handler: APIGatewayProxyHandler = async (event) => {
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "http://localhost:8080",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        "Access-Control-Allow-Methods": "OPTIONS,GET,POST,PUT,DELETE",
+        "Access-Control-Allow-Credentials": "true",
+      },
+      body: "",
+    };
+  }
   if (!topicName) {
     return {
       statusCode: 400,
@@ -26,8 +37,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
   try {
     const tokenResp = await authClient.generateApiKey(
-      PermissionScopes.topicPublishSubscribe({ name: topicName }, AllTopics),
-      ExpiresIn.minutes(30) // Increase the expiration time
+      AllDataReadWrite,
+      ExpiresIn.minutes(30)
     );
 
     if ("apiKey" in tokenResp) {
