@@ -143,6 +143,30 @@ export class InfrastructureStack extends cdk.Stack {
       postConfirmationFunction
     );
 
+    // Token Vending Machine
+    const tokenVendingMachineFunction = new lambdaNodejs.NodejsFunction(
+      this,
+      "TokenVendingMachine",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../..",
+          "packages/backend/src/handlers/tokenVendingMachine.ts"
+        ),
+        bundling: {
+          externalModules: ["aws-lambda"],
+        },
+        projectRoot: path.join(__dirname, "../.."),
+        environment: {
+          TOPIC_NAME: process.env.TOPIC_NAME!,
+          SECRET_ARN: momentoApiKeySecret.secretArn,
+        },
+      }
+    );
+    momentoApiKeySecret.grantRead(tokenVendingMachineFunction);
+
     // Get player Gold and Trophy
     const getPlayerProfileFn = new lambdaNodejs.NodejsFunction(
       this,
@@ -515,6 +539,17 @@ export class InfrastructureStack extends cdk.Stack {
       "ClashOfFarmsAuthorizer",
       {
         cognitoUserPools: [userPool],
+      }
+    );
+
+    // Token Vending Machine Endpoint
+    const token = api.root.addResource("tokens");
+    token.addMethod(
+      "GET",
+      new apigateway.LambdaIntegration(tokenVendingMachineFunction),
+      {
+        authorizer,
+        authorizationType: apigateway.AuthorizationType.COGNITO,
       }
     );
 
