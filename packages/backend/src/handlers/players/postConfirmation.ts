@@ -17,14 +17,16 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
   const preferredUsername = request.userAttributes.preferred_username;
 
   // Create player profile
+  const now = new Date().toISOString();
   const playerProfile = {
     PK: `PLAYER#${userName}`,
     SK: "PROFILE#",
-    preferredUsername,
-    gold: 1000,
-    trophy: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    PreferredUsername: preferredUsername,
+    Gold: 1000,
+    Trophy: 0,
+    Experience: 0,
+    CreatedAt: now,
+    UpdatedAt: now,
   };
 
   await docClient.send(
@@ -47,8 +49,9 @@ export const handler: PostConfirmationTriggerHandler = async (event) => {
     CACHE_NAME,
     preferredUsername,
     new Map<string, string>([
-      ["gold", playerProfile.gold.toString()],
-      ["trophy", playerProfile.trophy.toString()],
+      ["Gold", playerProfile.Gold.toString()],
+      ["Trophy", playerProfile.Trophy.toString()],
+      ["Experience", playerProfile.Experience.toString()],
     ])
   );
 
