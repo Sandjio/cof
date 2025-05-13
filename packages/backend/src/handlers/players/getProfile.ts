@@ -52,7 +52,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const cacheResp = await cacheClient.dictionaryGetFields(
       CACHE_NAME,
       username,
-      ["gold", "trophy"]
+      ["Gold", "Trophy", "Experience"]
     );
 
     if (cacheResp.type === CacheDictionaryGetFieldsResponse.Hit) {
@@ -75,8 +75,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     );
     if (
       !getResult.Item ||
-      !getResult.Item.gold === undefined ||
-      !getResult.Item.trophy === undefined
+      !getResult.Item.Gold === undefined ||
+      !getResult.Item.Trophy === undefined ||
+      !getResult.Item.Experience === undefined
     ) {
       return { statusCode: 404, headers, body: "Not found or incomplete data" };
     }
@@ -86,8 +87,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       CACHE_NAME,
       username,
       new Map<string, string>([
-        ["gold", getResult.Item.gold.toString()],
-        ["trophy", getResult.Item.trophy.toString()],
+        ["Gold", getResult.Item.Gold.toString()],
+        ["Trophy", getResult.Item.Trophy.toString()],
+        ["Experience", getResult.Item.Experience.toString()],
       ])
     );
 
@@ -95,8 +97,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       statusCode: 200,
       headers,
       body: JSON.stringify({
-        gold: getResult.Item.gold,
-        trophy: getResult.Item.trophy,
+        Gold: getResult.Item.Gold,
+        Trophy: getResult.Item.Trophy,
+        Experience: getResult.Item.Experience,
       }),
     };
   } catch (error) {
