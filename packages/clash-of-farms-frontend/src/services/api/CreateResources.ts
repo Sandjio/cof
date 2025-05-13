@@ -29,6 +29,8 @@ export const createPlant = async (name: string, type: string, cost: number) => {
                 type,
                 cost,
                 playerId,
+                xCoordinate: 0, // Default Coordinates for newly Purchased Plants
+                yCoordinate: 0,
             }),
         });
         if (!response.ok) {
