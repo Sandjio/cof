@@ -34,15 +34,21 @@ export const handler = async (
   try {
     const body = JSON.parse(event.body || "{}");
 
-    const { name, type, cost, playerId } = body;
+    const { name, type, cost, playerId, xCoordinate, yCoordinate } = body;
 
     // Basic validation
-    if (!name || !cost || !playerId) {
+    if (
+      !name ||
+      !cost == null ||
+      !playerId == null ||
+      xCoordinate ||
+      yCoordinate
+    ) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
-          message: "Name, cost, and playerId are required.",
+          message: "Name, cost, playerId, x and y coordinates are required.",
         }),
       };
     }
@@ -65,74 +71,126 @@ export const handler = async (
       };
     }
 
-    // 2. Check Gold
-    if (player.gold < cost) {
+    if (player.Gold < cost) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({ message: "Not enough gold to buy this plant." }),
       };
     }
-
-    // 3. Create the Plant
-    const plantId = uuidv4();
+    // 2. Prepare our “placement” object
     const now = new Date().toISOString();
-    const plantItem = {
-      PK: `PLAYER#${playerId}`,
-      SK: `PLANT#${plantId}`,
-      plantId,
-      name,
-      type: type || "unknown",
-      cost,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const instanceId = uuidv4();
+    const thisCoord = { id: instanceId, xCoordinate, yCoordinate };
+    const plantPK = `PLAYER#${playerId}`;
+    const plantSK = `PLANT#${name}`;
 
-    await docClient.send(
-      new TransactWriteCommand({
-        TransactItems: [
-          {
-            Put: {
-              TableName: GAME_TABLE_NAME,
-              Item: plantItem,
-              ConditionExpression:
-                "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-            },
-          },
-          {
-            Update: {
-              TableName: GAME_TABLE_NAME,
-              Key: {
-                PK: `PLAYER#${playerId}`,
-                SK: `PROFILE#`,
+    // 3. Try to create the PLANT item if it doesn't exist:
+    try {
+      // a) First-time purchase: Conditional Put + profile Update
+      await docClient.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Put: {
+                TableName: GAME_TABLE_NAME,
+                Item: {
+                  PK: plantPK,
+                  SK: plantSK,
+                  Name: name,
+                  Type: type || "unknown",
+                  Quantity: 1,
+                  Cost: cost,
+                  CreatedAt: now,
+                  UpdatedAt: now,
+                  Coordinates: [thisCoord],
+                },
+                ConditionExpression:
+                  "attribute_not_exists(PK) AND attribute_not_exists(SK)",
               },
-              UpdateExpression: "SET gold = gold - :cost",
-              ConditionExpression: "gold >= :cost",
-              ExpressionAttributeValues: {
-                ":cost": cost,
+            },
+            {
+              Update: {
+                TableName: GAME_TABLE_NAME,
+                Key: {
+                  PK: plantPK,
+                  SK: `PROFILE#`,
+                },
+                UpdateExpression: "SET Gold = Gold - :cost",
+                ConditionExpression: "Gold >= :cost",
+                ExpressionAttributeValues: {
+                  ":cost": cost,
+                },
               },
             },
-          },
-        ],
-      })
-    );
+          ],
+        })
+      );
+    } catch (error: any) {
+      if (
+        error.name === "TransactionCanceledException" &&
+        Array.isArray(error.CancellationReasons) &&
+        error.CancellationReasons[0].Code === "ConditionalCheckFailed"
+      ) {
+        // b) Already have this plant: Increment & append coord + profile Update
+        await docClient.send(
+          new TransactWriteCommand({
+            TransactItems: [
+              {
+                Update: {
+                  TableName: GAME_TABLE_NAME,
+                  Key: { PK: plantPK, SK: plantSK },
+                  UpdateExpression: `
+                    SET UpdatedAt = :now,
+                        Coordinates = list_append(Coordinates, :coord)
+                    ADD Quantity :inc
+                  `,
+                  ExpressionAttributeValues: {
+                    ":now": now,
+                    ":inc": 1,
+                    ":coord": [thisCoord],
+                  },
+                  ConditionExpression:
+                    "attribute_exists(PK) AND attribute_exists(SK)",
+                },
+              },
+              {
+                Update: {
+                  TableName: GAME_TABLE_NAME,
+                  Key: { PK: plantPK, SK: `PROFILE#` },
+                  UpdateExpression: "SET Gold = Gold - :c",
+                  ConditionExpression: "Gold >= :c",
+                  ExpressionAttributeValues: { ":c": cost },
+                },
+              },
+            ],
+          })
+        );
+      } else {
+        throw error;
+      }
+    }
 
     // get Momento API key & client
     const apiKey = await getMomentoApiKey();
     const credProvider = CredentialProvider.fromString(apiKey);
 
-    const cacheClient = new CacheClient({
+    const cache = new CacheClient({
       configuration: Configurations.Lambda.latest(),
       credentialProvider: credProvider,
       defaultTtlSeconds: momentoTtl,
     });
+    const userKey = player.PreferredUsername;
 
-    // Update the value in the cache
-    await cacheClient.dictionaryIncrement(
+    // a) Decrement gold in cache:
+    await cache.dictionaryIncrement(CACHE_NAME, userKey, "Gold", -cost);
+    // b) Increment this plant’s count in cache:
+    await cache.dictionaryIncrement(CACHE_NAME, userKey, `Plants:${name}`, 1);
+    // c) Record this placement into a Momento List:
+    await cache.listPushBack(
       CACHE_NAME,
-      player.preferredUsername,
-      "gold",
-      -cost
+      `${userKey}#${name}#coords`,
+      JSON.stringify(thisCoord)
     );
 
     return {
@@ -140,13 +198,19 @@ export const handler = async (
       headers,
       body: JSON.stringify({
         message: "Plant purchased successfully!",
-        plant: plantItem,
-        newGoldAmount: player.gold - cost,
+        plant: {
+          name,
+          type,
+          cost,
+          placedAt: now,
+          instanceId,
+          coordinate: thisCoord,
+        },
+        gold: player.Gold - cost,
       }),
     };
   } catch (error) {
     console.error("Error purchasing plant:", error);
-
     return {
       statusCode: 500,
       headers,
