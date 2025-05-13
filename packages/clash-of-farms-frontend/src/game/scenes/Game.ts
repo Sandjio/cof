@@ -1,5 +1,6 @@
 import { GameObjects, Scene, Math as PhaserMath } from "phaser";
 import { EventBus } from "../EventBus";
+import { ShopItem } from "./Shop";
 
 export class Game extends Scene {
     private initData: { gold: number; trophy: number };
@@ -37,6 +38,12 @@ export class Game extends Scene {
             y: this.worldSize.height / 2,
             scale: 0.1,
         },
+        {
+            key: "gold-storage",
+            x: this.worldSize.width / 2 - 500,
+            y: this.worldSize.height / 2 - 500,
+            scale: 0.1,
+        },
     ];
 
     constructor() {
@@ -46,6 +53,18 @@ export class Game extends Scene {
         this.initData = data;
     }
     create() {
+        EventBus.on("shop-purchased", (item: ShopItem) => {
+            const padding = 200;
+            const x = PhaserMath.Between(
+                padding,
+                this.worldSize.width - padding
+            );
+            const y = PhaserMath.Between(
+                padding,
+                this.worldSize.height - padding
+            );
+            this.placeableConfigs.push({ key: item.key, x, y, scale: 0.1 });
+        });
         // const data = this.initData;
         // console.log(`Here is the :${data}`);
         // const { gold, trophy } = data;
