@@ -6,7 +6,7 @@ import {
     createAttack,
 } from "@/services/api/CreateResources";
 
-interface ShopItem {
+export interface ShopItem {
     key: string; // unique identifier
     label: string; // displayed name
     cost: number; // gold cost
@@ -20,6 +20,8 @@ interface ShopCategory {
 export class Shop extends Scene {
     private categories: ShopCategory[];
     private gold: number;
+    // private purchasedItems: ShopItem[] = [];
+
     constructor() {
         super("Shop");
         this.categories = [
@@ -125,38 +127,52 @@ export class Shop extends Scene {
         EventBus.emit("current-scene-ready", this);
     }
 
-    // private async publishPurchaseEvent(itemKey: string, cost: number) {
-    //     const client = await getMomentoClient();
-    //     const instance = AuthService.getInstance();
-    //     const user = instance.getUserFromIdToken();
-    //     const payload = {
-    //         userId: user.userId,
-    //         itemKey,
-    //         cost,
-    //         timestamp: new Date().toISOString(),
-    //     };
-    //     const rs = await client.publish(
-    //         "clash-of-farms-cache",
-    //         "clash-of-farms-topic",
-    //         JSON.stringify(payload)
-    //     );
-    //     console.log(`Here is the ${rs}`);
-    // }
+    showSuccessMessage(message: string) {
+        const text = this.add
+            .text(this.cameras.main.centerX, 50, message, {
+                fontSize: "20px",
+                color: "#00ff00",
+                fontStyle: "bold",
+                backgroundColor: "#000000aa",
+                padding: { x: 10, y: 5 },
+            })
+            .setOrigin(0.5)
+            .setDepth(1000);
+
+        // Auto-destroy after 2 seconds with fade-out
+        this.tweens.add({
+            targets: text,
+            alpha: 0,
+            duration: 1000,
+            delay: 1000,
+            onComplete: () => text.destroy(),
+        });
+    }
 
     private async attemptPurchase(item: ShopItem, category: ShopCategory) {
         if (this.gold >= item.cost) {
             this.gold -= item.cost;
-            // TODO: add item to inventory
+            EventBus.emit("shop-purchased", item);
+
             try {
                 switch (category.name) {
                     case "Crops":
                         await createPlant(item.key, item.label, item.cost);
+                        this.showSuccessMessage(
+                            `✅ Crop created: ${item.label}`
+                        );
                         break;
                     case "Defenses":
                         await createDefense(item.key, item.label, item.cost);
+                        this.showSuccessMessage(
+                            `🛡️ Defense created: ${item.label}`
+                        );
                         break;
                     case "Attacks":
                         await createAttack(item.key, item.label, item.cost);
+                        this.showSuccessMessage(
+                            `⚔️ Attack created: ${item.label}`
+                        );
                         break;
                     default:
                         console.warn(`Unknown category: ${category.name}`);
@@ -164,7 +180,6 @@ export class Shop extends Scene {
             } catch (e) {
                 console.error("🚨 Failed to send purchase event:", e);
             }
-            // EventBus.emit("item-purchased", item.key);
             // console.log("Item purchased:", item.key);
             this.refreshGoldDisplay();
         } else {
