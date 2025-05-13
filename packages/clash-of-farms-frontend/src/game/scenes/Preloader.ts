@@ -31,6 +31,8 @@ export class Preloader extends Scene {
         this.load.image("trophy", "golden-trophy-medium.png");
         this.load.image("fight", "fight.png");
         this.load.image("shop", "shop.png");
+        this.load.image("corn", "corn.png");
+        this.load.image("gold-storage", "gold-storage.png");
     }
 
     create() {
