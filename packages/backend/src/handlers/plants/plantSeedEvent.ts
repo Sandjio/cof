@@ -118,9 +118,10 @@ export const handler = async (
     };
     const coordsListKey = `${userKey}#${plantName}#coords`;
     console.log(`Here is the Momento Response: ${momento_res}`);
-    await cache.listPushBack(
+    await cache.dictionarySetField(
       CACHE_NAME,
       coordsListKey,
+      coordEntry.id,
       JSON.stringify(coordEntry)
     );
     return {

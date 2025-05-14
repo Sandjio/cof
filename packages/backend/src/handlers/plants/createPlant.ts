@@ -187,9 +187,10 @@ export const handler = async (
     // b) Increment this plant’s count in cache:
     await cache.dictionaryIncrement(CACHE_NAME, userKey, `Plants:${name}`, 1);
     // c) Record this placement into a Momento List:
-    await cache.listPushBack(
+    await cache.dictionarySetField(
       CACHE_NAME,
       `${userKey}#${name}#coords`,
+      thisCoord.id,
       JSON.stringify(thisCoord)
     );
 
