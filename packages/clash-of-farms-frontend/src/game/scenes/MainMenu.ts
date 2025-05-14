@@ -10,7 +10,7 @@ export class MainMenu extends Scene {
 
     private authService: AuthService;
     // private backgroundMusic: Phaser.Sound.BaseSound;
-    private initData: { gold: number; trophy: number };
+    private initData: { Gold: number; Trophy: number; Experience: number };
 
     constructor() {
         super("MainMenu");
@@ -31,7 +31,7 @@ export class MainMenu extends Scene {
 
         const centerX = this.cameras.main.width / 2;
         const centerY = this.cameras.main.height / 2;
-        const { gold, trophy } = this.initData;
+        const { Gold, Trophy, Experience } = this.initData;
         // console.log(`Here is the gold: ${gold} and trophy: ${trophy}`);
         this.playButton = this.add
             .text(centerX, centerY, "Play", {
@@ -43,7 +43,7 @@ export class MainMenu extends Scene {
             .setOrigin(0.5)
             .setInteractive({ useHandCursor: true });
         this.playButton.on("pointerdown", () => {
-            changeScene(this, "Game", { gold, trophy });
+            changeScene(this, "Game", { Gold, Trophy, Experience });
         });
         // Logout button
         this.logoutButton = this.add
