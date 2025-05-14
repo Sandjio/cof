@@ -267,11 +267,14 @@ export class InfrastructureStack extends cdk.Stack {
         timeout: Duration.seconds(30),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
+          CACHE_NAME: process.env.CACHE_NAME!,
+          SECRET_ARN: momentoApiKeySecret.secretArn,
         },
       }
     );
 
     gameTable.grantReadWriteData(plantSeedFn);
+    momentoApiKeySecret.grantRead(plantSeedFn);
 
     // Create a Lambda function for creating a battle
     const startBattleFunction = new lambdaNodejs.NodejsFunction(
