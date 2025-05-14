@@ -10,9 +10,11 @@ export interface ShopItem {
     key: string; // unique identifier
     label: string; // displayed name
     cost: number; // gold cost
+    instanceId?: string;
+    placedAt?: string;
 }
 
-interface ShopCategory {
+export interface ShopCategory {
     name: string;
     items: ShopItem[];
 }
@@ -152,12 +154,16 @@ export class Shop extends Scene {
     private async attemptPurchase(item: ShopItem, category: ShopCategory) {
         if (this.gold >= item.cost) {
             this.gold -= item.cost;
-            EventBus.emit("shop-purchased", item);
-
             try {
                 switch (category.name) {
                     case "Crops":
-                        await createPlant(item.key, item.label, item.cost);
+                        const response = await createPlant(
+                            item.key,
+                            item.label,
+                            item.cost
+                        );
+                        // console.log("🌾 Plant created:", response.plant);
+                        item.instanceId = response.plant.instanceId;
                         this.showSuccessMessage(
                             `✅ Crop created: ${item.label}`
                         );
@@ -177,6 +183,7 @@ export class Shop extends Scene {
                     default:
                         console.warn(`Unknown category: ${category.name}`);
                 }
+                EventBus.emit("shop-purchased", item, category);
             } catch (e) {
                 console.error("🚨 Failed to send purchase event:", e);
             }
