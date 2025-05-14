@@ -78,7 +78,7 @@ export const handler = async (
         body: JSON.stringify({ message: "Not enough gold to buy this plant." }),
       };
     }
-    // 2. Prepare our “placement” object
+
     const now = new Date().toISOString();
     const instanceId = uuidv4();
     const thisCoord = { id: instanceId, xCoordinate, yCoordinate };

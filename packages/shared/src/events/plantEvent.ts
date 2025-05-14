@@ -4,6 +4,7 @@ export type PlantSeededEvent = {
   timestamp: string;
   payload: {
     plantId: string;
+    plantName: string;
     xCoordinate: string;
     yCoordinate: string;
   };

@@ -78,6 +78,7 @@ export class Game extends Scene {
                     this.createPlaceable({ key: item.key, x, y, scale: 0.1 });
                     this.publishPlantSeedEvent(
                         item.instanceId!,
+                        item.key,
                         x.toString(),
                         y.toString()
                     );
@@ -741,7 +742,12 @@ export class Game extends Scene {
         // Ensure camera stays within bounds during updates
         this.constrainCamera();
     }
-    private async publishPlantSeedEvent(itemKey: string, x: string, y: string) {
+    private async publishPlantSeedEvent(
+        itemKey: string,
+        name: string,
+        x: string,
+        y: string
+    ) {
         const client = await getMomentoClient();
         const instance = AuthService.getInstance();
         const user = instance.getUserFromIdToken();
@@ -751,6 +757,7 @@ export class Game extends Scene {
             timestamp: new Date().toISOString(),
             payload: {
                 plantId: itemKey,
+                plantName: name,
                 xCoordinate: x,
                 yCoordinate: y,
             },
