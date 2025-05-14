@@ -1,10 +1,12 @@
 import { GameObjects, Scene, Math as PhaserMath } from "phaser";
 import { EventBus } from "../EventBus";
-import { ShopItem } from "./Shop";
+import { ShopItem, ShopCategory } from "./Shop";
+import { getMomentoClient } from "@/utils/momento";
+import { AuthService } from "@/services/AuthService";
+import { PlantSeededEvent } from "shared/src/events/plantEvent";
 
 export class Game extends Scene {
-    private initData: { gold: number; trophy: number };
-
+    private initData: { Gold: number; Trophy: number; Experience: number };
     // Camera control properties
     private isDragging: boolean = false;
     private lastPointerPosition: { x: number; y: number } | null = null;
@@ -21,6 +23,7 @@ export class Game extends Scene {
     private trophyText?: GameObjects.Text;
     private fight?: GameObjects.Image;
     private shop?: GameObjects.Image;
+    private experienceText: GameObjects.Text;
 
     private uiCamera?: Phaser.Cameras.Scene2D.Camera;
     private worldContainer: Phaser.GameObjects.Container;
@@ -53,22 +56,34 @@ export class Game extends Scene {
         this.initData = data;
     }
     create() {
-        EventBus.on("shop-purchased", (item: ShopItem) => {
-            const padding = 200;
-            const x = PhaserMath.Between(
-                padding,
-                this.worldSize.width - padding
-            );
-            const y = PhaserMath.Between(
-                padding,
-                this.worldSize.height - padding
-            );
-            this.placeableConfigs.push({ key: item.key, x, y, scale: 0.1 });
-        });
-        // const data = this.initData;
-        // console.log(`Here is the :${data}`);
-        // const { gold, trophy } = data;
-        // console.log(`Here is the gold: ${gold} and trophy: ${trophy}`);
+        EventBus.on(
+            "shop-purchased",
+            (item: ShopItem, category: ShopCategory) => {
+                if (category.name === "Crops") {
+                    const padding = 100;
+                    const x = PhaserMath.Between(
+                        padding,
+                        this.worldSize.width - padding
+                    );
+                    const y = PhaserMath.Between(
+                        padding,
+                        this.worldSize.height - padding
+                    );
+                    this.placeableConfigs.push({
+                        key: item.key,
+                        x,
+                        y,
+                        scale: 0.1,
+                    });
+                    this.createPlaceable({ key: item.key, x, y, scale: 0.1 });
+                    this.publishPlantSeedEvent(
+                        item.instanceId!,
+                        x.toString(),
+                        y.toString()
+                    );
+                }
+            }
+        );
 
         // Initialize the world container first
         this.worldContainer = this.add.container(0, 0);
@@ -131,7 +146,7 @@ export class Game extends Scene {
 
     setupUICamera() {
         const data = this.initData;
-        const { gold, trophy } = data;
+        const { Gold, Trophy, Experience } = data;
 
         // Create a separate camera for UI elements
         this.uiCamera = this.cameras.add(
@@ -155,7 +170,7 @@ export class Game extends Scene {
 
         // Add a text to show gold count
         this.goldText = this.add
-            .text(this.scale.width - 90, 50, `${gold}`, {
+            .text(this.scale.width - 90, 50, `${Gold}`, {
                 fontFamily: "Arial",
                 fontSize: "24px",
                 color: "#FFD700",
@@ -165,13 +180,18 @@ export class Game extends Scene {
         // Add trophy image to the top left of the scene
         this.trophy = this.add.image(50, 50, "trophy").setScale(0.2);
         this.trophyText = this.add
-            .text(80, 50, `${trophy}`, {
+            .text(80, 50, `${Trophy}`, {
                 fontFamily: "Arial",
                 fontSize: "24px",
                 color: "#FFD700",
             })
             .setOrigin(0, 0.5);
 
+        this.experienceText = this.add.text(40, 100, `XP: ${Experience}`, {
+            fontFamily: "Arial",
+            fontSize: "24px",
+            color: "#FFD700",
+        });
         // Add Battle image at the bottom left of the scene
         this.fight = this.add
             .image(60, this.scale.height - 100, "fight")
@@ -183,7 +203,7 @@ export class Game extends Scene {
             .setScale(0.1)
             .setInteractive({ useHandCursor: true })
             .on("pointerdown", () => {
-                this.scene.start("Shop", { gold: data.gold });
+                this.scene.start("Shop", { gold: data.Gold });
             });
 
         if (
@@ -192,7 +212,8 @@ export class Game extends Scene {
             this.trophy &&
             this.trophyText &&
             this.fight &&
-            this.shop
+            this.shop &&
+            this.experienceText
         ) {
             // Don't move with camera
             this.goldCoin.setScrollFactor(0);
@@ -201,6 +222,7 @@ export class Game extends Scene {
             this.trophyText.setScrollFactor(0);
             this.fight.setScrollFactor(0);
             this.shop.setScrollFactor(0);
+            this.experienceText.setScrollFactor(0);
 
             // Remove UI elements from the main camera
             this.cameras.main.ignore([
@@ -210,6 +232,7 @@ export class Game extends Scene {
                 this.trophyText,
                 this.fight,
                 this.shop,
+                this.experienceText,
             ]);
 
             // Ensure UI camera only sees UI elements
@@ -228,7 +251,8 @@ export class Game extends Scene {
             this.trophyText &&
             this.uiCamera &&
             this.fight &&
-            this.shop
+            this.shop &&
+            this.experienceText
         ) {
             // Resize UI camera viewport
             this.uiCamera.setSize(gameSize.width, gameSize.height);
@@ -246,6 +270,11 @@ export class Game extends Scene {
             this.fight.setPosition(60, gameSize.height - 100);
 
             this.shop.setPosition(gameSize.width - 60, gameSize.height - 100);
+
+            this.experienceText.setPosition(
+                gameSize.width - 40,
+                gameSize.height - 100
+            );
 
             // Reposition debug text if it exists
             // if (this.debugText) {
@@ -704,13 +733,34 @@ export class Game extends Scene {
 
         //  emit an event when clicked
         img.on("pointerdown", () => {
-            this.events.emit("building-selected", img);
+            // this.events.emit("building-selected", img);
         });
     }
 
     update() {
         // Ensure camera stays within bounds during updates
         this.constrainCamera();
+    }
+    private async publishPlantSeedEvent(itemKey: string, x: string, y: string) {
+        const client = await getMomentoClient();
+        const instance = AuthService.getInstance();
+        const user = instance.getUserFromIdToken();
+        const payload: PlantSeededEvent = {
+            eventType: "PlantSeeded",
+            playerId: user.userId,
+            timestamp: new Date().toISOString(),
+            payload: {
+                plantId: itemKey,
+                xCoordinate: x,
+                yCoordinate: y,
+            },
+        };
+        const rs = await client.publish(
+            "clash-of-farms-cache",
+            "clash-of-farms-topic",
+            JSON.stringify(payload)
+        );
+        // console.log(`Here is the ${rs}`);
     }
 }
 
