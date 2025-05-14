@@ -323,11 +323,14 @@ export class InfrastructureStack extends cdk.Stack {
         projectRoot: path.join(__dirname, "../.."),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
+          SECRET_ARN: momentoApiKeySecret.secretArn,
+          CACHE_NAME: process.env.CACHE_NAME!,
         },
       }
     );
 
     gameTable.grantReadData(getPlantsFn);
+    momentoApiKeySecret.grantRead(getPlantsFn);
 
     const getDefenseTroopsFn = new lambdaNodejs.NodejsFunction(
       this,
