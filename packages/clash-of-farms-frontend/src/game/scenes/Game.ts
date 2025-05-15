@@ -33,6 +33,7 @@ export class Game extends Scene {
     private fight?: GameObjects.Image;
     private shop?: GameObjects.Image;
     private experienceText: GameObjects.Text;
+    private menu?: GameObjects.Image;
 
     private uiCamera?: Phaser.Cameras.Scene2D.Camera;
     private worldContainer: Phaser.GameObjects.Container;
@@ -256,6 +257,14 @@ export class Game extends Scene {
         this.fight = this.add
             .image(60, this.scale.height - 100, "fight")
             .setScale(0.1);
+        // Add the Menu Icon
+        this.menu = this.add
+            .image(60, this.scale.height - 200, "menu")
+            .setScale(0.1)
+            .setInteractive({ useHandCursor: true })
+            .on("pointerdown", () => {
+                this.scene.start("MainMenu");
+            });
 
         // Add the shop icon at the bottom right of the scene
         this.shop = this.add
@@ -273,7 +282,8 @@ export class Game extends Scene {
             this.trophyText &&
             this.fight &&
             this.shop &&
-            this.experienceText
+            this.experienceText &&
+            this.menu
         ) {
             // Don't move with camera
             this.goldCoin.setScrollFactor(0);
@@ -283,6 +293,7 @@ export class Game extends Scene {
             this.fight.setScrollFactor(0);
             this.shop.setScrollFactor(0);
             this.experienceText.setScrollFactor(0);
+            this.menu.setScrollFactor(0);
 
             // Remove UI elements from the main camera
             this.cameras.main.ignore([
@@ -293,6 +304,7 @@ export class Game extends Scene {
                 this.fight,
                 this.shop,
                 this.experienceText,
+                this.menu,
             ]);
 
             // Ensure UI camera only sees UI elements
@@ -312,7 +324,8 @@ export class Game extends Scene {
             this.uiCamera &&
             this.fight &&
             this.shop &&
-            this.experienceText
+            this.experienceText &&
+            this.menu
         ) {
             // Resize UI camera viewport
             this.uiCamera.setSize(gameSize.width, gameSize.height);
@@ -335,6 +348,8 @@ export class Game extends Scene {
                 gameSize.width - 40,
                 gameSize.height - 100
             );
+
+            this.menu.setPosition(gameSize.width - 60, gameSize.height - 200);
 
             // Reposition debug text if it exists
             // if (this.debugText) {
