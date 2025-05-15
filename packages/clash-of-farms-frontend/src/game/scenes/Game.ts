@@ -4,9 +4,18 @@ import { ShopItem, ShopCategory } from "./Shop";
 import { getMomentoClient } from "@/utils/momento";
 import { AuthService } from "@/services/AuthService";
 import { PlantSeededEvent } from "shared/src/events/plantEvent";
+import { Plant, UserStats } from "shared/src/types/types";
+
+interface PlaceableConfig {
+    key: string;
+    x: number;
+    y: number;
+    scale?: number;
+    id?: string;
+}
 
 export class Game extends Scene {
-    private initData: { Gold: number; Trophy: number; Experience: number };
+    private initData: { userStats: UserStats; plants: Plant[] };
     // Camera control properties
     private isDragging: boolean = false;
     private lastPointerPosition: { x: number; y: number } | null = null;
@@ -29,12 +38,7 @@ export class Game extends Scene {
     private worldContainer: Phaser.GameObjects.Container;
     // private debugText?: GameObjects.Text;
     private isDraggingSprite = false;
-    private placeableConfigs: Array<{
-        key: string;
-        x: number;
-        y: number;
-        scale?: number;
-    }> = [
+    private placeableConfigs: PlaceableConfig[] = [
         {
             key: "barn",
             x: this.worldSize.width / 2,
@@ -52,22 +56,77 @@ export class Game extends Scene {
     constructor() {
         super("Game");
     }
+
     init(data: any) {
         this.initData = data;
+        // Process user plants data
+        this.processUserPlants();
     }
+
+    // Process the plants data and add to placeableConfigs
+    private processUserPlants(): void {
+        if (
+            !this.initData ||
+            !this.initData.plants ||
+            !Array.isArray(this.initData.plants)
+        ) {
+            console.error("No plants data available");
+            return;
+        }
+
+        // Process each plant in the plants array
+        this.initData.plants.forEach((plant: Plant) => {
+            if (!plant.coordinates || !Array.isArray(plant.coordinates)) {
+                console.error("Invalid plant data structure", plant);
+                return;
+            }
+
+            // Add each coordinate of this plant type to placeableConfigs
+            plant.coordinates.forEach((coord: any) => {
+                // Accept both string and number for compatibility
+                const x =
+                    typeof coord.xCoordinate === "number"
+                        ? coord.xCoordinate
+                        : parseInt(coord.xCoordinate);
+                const y =
+                    typeof coord.yCoordinate === "number"
+                        ? coord.yCoordinate
+                        : parseInt(coord.yCoordinate);
+
+                if (isNaN(x) || isNaN(y)) {
+                    console.error("Invalid coordinates for plant", coord);
+                    return;
+                }
+
+                this.placeableConfigs.push({
+                    key: plant.name, // Use plant name as the sprite key
+                    x: x,
+                    y: y,
+                    scale: 0.1,
+                    id: coord.id,
+                });
+            });
+        });
+    }
+
     create() {
         EventBus.on(
             "shop-purchased",
             (item: ShopItem, category: ShopCategory) => {
                 if (category.name === "Crops") {
+                    if (!this.mainCamera) {
+                        console.error("Main camera is not initialized.");
+                        return;
+                    }
+                    const cameraView = this.mainCamera.worldView;
                     const padding = 100;
                     const x = PhaserMath.Between(
-                        padding,
-                        this.worldSize.width - padding
+                        cameraView.x + padding,
+                        cameraView.x + cameraView.width - padding
                     );
                     const y = PhaserMath.Between(
-                        padding,
-                        this.worldSize.height - padding
+                        cameraView.y + padding,
+                        cameraView.y + cameraView.height - padding
                     );
                     this.placeableConfigs.push({
                         key: item.key,
@@ -146,8 +205,8 @@ export class Game extends Scene {
     }
 
     setupUICamera() {
-        const data = this.initData;
-        const { Gold, Trophy, Experience } = data;
+        const stats = this.initData.userStats;
+        const { Gold, Trophy, Experience } = stats;
 
         // Create a separate camera for UI elements
         this.uiCamera = this.cameras.add(
@@ -204,7 +263,7 @@ export class Game extends Scene {
             .setScale(0.1)
             .setInteractive({ useHandCursor: true })
             .on("pointerdown", () => {
-                this.scene.start("Shop", { gold: data.Gold });
+                this.scene.start("Shop", { gold: Gold });
             });
 
         if (
@@ -495,10 +554,25 @@ export class Game extends Scene {
                 gameObject: Phaser.GameObjects.GameObject & {
                     x: number;
                     y: number;
+                    gameObjectType?: string;
+                    plantId?: string;
                 }
             ) => {
                 console.log("Dropped sprite at", gameObject.x, gameObject.y);
                 this.isDraggingSprite = false;
+
+                // If this is a plant with an ID, update its position in the backend
+                if (
+                    gameObject.gameObjectType === "plant" &&
+                    gameObject.plantId
+                ) {
+                    this.publishPlantSeedEvent(
+                        gameObject.plantId,
+                        (gameObject as Phaser.GameObjects.Image).texture.key,
+                        gameObject.x.toString(),
+                        gameObject.y.toString()
+                    );
+                }
             }
         );
 
@@ -717,31 +791,38 @@ export class Game extends Scene {
     }
 
     // Creates a placeable image/sprite that the user can drag around.
-    private createPlaceable(cfg: {
-        key: string;
-        x: number;
-        y: number;
-        scale?: number;
-    }) {
+    private createPlaceable(cfg: PlaceableConfig) {
         const img = this.add
             .image(cfg.x, cfg.y, cfg.key)
             .setOrigin(0.5)
             .setScale(cfg.scale ?? 1)
             .setInteractive({ draggable: true });
 
+        // Add custom properties to track plant-specific data
+        if (cfg.id) {
+            (img as any).gameObjectType = "plant";
+            (img as any).plantId = cfg.id;
+        }
+
         // ensure it lives in the worldContainer so camera pans/zooms affect it
         this.worldContainer.add(img);
 
-        //  emit an event when clicked
+        // emit an event when clicked
         img.on("pointerdown", () => {
-            // this.events.emit("building-selected", img);
+            if ((img as any).gameObjectType === "plant") {
+                console.log(`Selected plant with ID: ${(img as any).plantId}`);
+                // Add additional visual feedback or display information here
+            }
         });
+
+        return img;
     }
 
     update() {
         // Ensure camera stays within bounds during updates
         this.constrainCamera();
     }
+
     private async publishPlantSeedEvent(
         itemKey: string,
         name: string,
