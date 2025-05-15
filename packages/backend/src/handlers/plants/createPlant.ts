@@ -185,7 +185,12 @@ export const handler = async (
     // a) Decrement gold in cache:
     await cache.dictionaryIncrement(CACHE_NAME, userKey, "Gold", -cost);
     // b) Increment this plant’s count in cache:
-    await cache.dictionaryIncrement(CACHE_NAME, userKey, `Plants:${name}`, 1);
+    await cache.dictionaryIncrement(
+      CACHE_NAME,
+      `${userKey}#Plants`,
+      `Plants:${name}`,
+      1
+    );
     // c) Record this placement into a Momento List:
     await cache.dictionarySetField(
       CACHE_NAME,

@@ -76,7 +76,10 @@ export const handler: APIGatewayProxyHandler = async (
     });
 
     // 3. Try reading plant counts from cache
-    const fetchCounts = await cache.dictionaryFetch(CACHE_NAME, userKey);
+    const fetchCounts = await cache.dictionaryFetch(
+      CACHE_NAME,
+      `${userKey}#Plants`
+    );
     if (fetchCounts instanceof CacheDictionaryFetch.Hit) {
       const entries = fetchCounts.value();
       console.log(`Here are the entries: ${entries}`);
@@ -159,7 +162,7 @@ export const handler: APIGatewayProxyHandler = async (
         // set count
         await cache.dictionarySetField(
           CACHE_NAME,
-          userKey,
+          `${userKey}#Plants`,
           `Plants:${name}`,
           quantity.toString()
         );
