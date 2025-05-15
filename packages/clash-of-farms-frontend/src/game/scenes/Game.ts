@@ -113,7 +113,7 @@ export class Game extends Scene {
         EventBus.on(
             "shop-purchased",
             (item: ShopItem, category: ShopCategory) => {
-                if (category.name === "Crops") {
+                if (category.name === "Crops/Animals") {
                     if (!this.mainCamera) {
                         console.error("Main camera is not initialized.");
                         return;
@@ -496,11 +496,11 @@ export class Game extends Scene {
             if (this.mainCamera) {
                 this.mainCamera.scrollX -= deltaX / this.mainCamera.zoom;
                 this.mainCamera.scrollY -= deltaY / this.mainCamera.zoom;
-                console.log(
-                    "Camera scroll:",
-                    this.mainCamera.scrollX,
-                    this.mainCamera.scrollY
-                );
+                // console.log(
+                //     "Camera scroll:",
+                //     this.mainCamera.scrollX,
+                //     this.mainCamera.scrollY
+                // );
             }
 
             // Update last position
@@ -698,7 +698,7 @@ export class Game extends Scene {
                     0.5,
                     2.0
                 );
-                console.log("Keyboard zoom in:", newZoom);
+                // console.log("Keyboard zoom in:", newZoom);
                 this.mainCamera.zoomTo(newZoom, 200);
 
                 // if (this.debugText) {
@@ -714,7 +714,7 @@ export class Game extends Scene {
                     0.5,
                     2.0
                 );
-                console.log("Keyboard zoom out:", newZoom);
+                // console.log("Keyboard zoom out:", newZoom);
                 this.mainCamera.zoomTo(newZoom, 200);
 
                 // if (this.debugText) {

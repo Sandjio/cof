@@ -36,6 +36,7 @@ export class Preloader extends Scene {
         this.load.image("shop", "shop.png");
         this.load.image("corn", "corn.png");
         this.load.image("gold-storage", "gold-storage.png");
+        this.load.image("Chicken", "Chicken.png");
     }
 
     create() {
@@ -46,6 +47,7 @@ export class Preloader extends Scene {
 
             // console.log(userData);
             this.scene.start("MainMenu", { userData });
+            // this.scene.start("MainMenu");
         };
         loadMainScene();
     }
