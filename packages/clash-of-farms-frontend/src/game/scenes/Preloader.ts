@@ -1,6 +1,9 @@
 import { Scene } from "phaser";
-import { fetchPlayerStats } from "@/services/api/FetchUserStats";
-
+import {
+    fetchPlayerStats,
+    fetchPlayerPlants,
+} from "@/services/api/FetchResources";
+import { Plant } from "shared/src/types/types";
 export class Preloader extends Scene {
     constructor() {
         super("Preloader");
@@ -38,8 +41,11 @@ export class Preloader extends Scene {
     create() {
         const loadMainScene = async () => {
             const userStats = await fetchPlayerStats();
-            // console.log(userStats);
-            this.scene.start("MainMenu", { userStats });
+            const plants: Plant[] = await fetchPlayerPlants();
+            const userData = { userStats, plants };
+
+            // console.log(userData);
+            this.scene.start("MainMenu", { userData });
         };
         loadMainScene();
     }

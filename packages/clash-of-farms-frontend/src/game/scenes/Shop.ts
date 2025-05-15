@@ -155,6 +155,7 @@ export class Shop extends Scene {
         if (this.gold >= item.cost) {
             this.gold -= item.cost;
             try {
+                let purchasedItem: ShopItem = { ...item }; // Clone the item
                 switch (category.name) {
                     case "Crops":
                         const response = await createPlant(
@@ -163,7 +164,7 @@ export class Shop extends Scene {
                             item.cost
                         );
                         // console.log("🌾 Plant created:", response.plant);
-                        item.instanceId = response.plant.instanceId;
+                        purchasedItem.instanceId = response.plant.instanceId;
                         this.showSuccessMessage(
                             `✅ Crop created: ${item.label}`
                         );

@@ -17,7 +17,7 @@ export class MainMenu extends Scene {
         this.authService = AuthService.getInstance();
     }
     init(data: any) {
-        this.initData = data.userStats;
+        this.initData = data.userData;
     }
     create() {
         this.background = this.add.image(0, 0, "backgroundImage").setOrigin(0);
@@ -43,7 +43,7 @@ export class MainMenu extends Scene {
             .setOrigin(0.5)
             .setInteractive({ useHandCursor: true });
         this.playButton.on("pointerdown", () => {
-            changeScene(this, "Game", { Gold, Trophy, Experience });
+            changeScene(this, "Game", this.initData);
         });
         // Logout button
         this.logoutButton = this.add
