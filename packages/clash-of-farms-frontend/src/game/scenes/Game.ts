@@ -5,6 +5,7 @@ import { getMomentoClient } from "@/utils/momento";
 import { AuthService } from "@/services/AuthService";
 import { PlantSeededEvent } from "shared/src/events/plantEvent";
 import { Plant, UserStats } from "shared/src/types/types";
+import { PlantHarvestedEvent } from "shared/src/events/plantEvent";
 
 interface PlaceableConfig {
     key: string;
@@ -34,6 +35,7 @@ export class Game extends Scene {
     private shop?: GameObjects.Image;
     private experienceText: GameObjects.Text;
     private menu?: GameObjects.Image;
+    private selectedPlantText: GameObjects.Text | undefined;
 
     private uiCamera?: Phaser.Cameras.Scene2D.Camera;
     private worldContainer: Phaser.GameObjects.Container;
@@ -822,10 +824,47 @@ export class Game extends Scene {
         // ensure it lives in the worldContainer so camera pans/zooms affect it
         this.worldContainer.add(img);
 
-        // emit an event when clicked
         img.on("pointerdown", () => {
             if ((img as any).gameObjectType === "plant") {
                 console.log(`Selected plant with ID: ${(img as any).plantId}`);
+                // Add additional visual feedback or display information here
+                if (this.selectedPlantText) {
+                    this.selectedPlantText.destroy();
+                }
+                this.selectedPlantText = this.add
+                    .text(cfg.x, cfg.y - 60, `Harvest: ${cfg.key}`, {
+                        fontFamily: "Arial",
+                        fontSize: "18px",
+                        color: "#00ff00",
+                        backgroundColor: "#222",
+                        padding: { x: 8, y: 4 },
+                    })
+                    .setOrigin(0.5)
+                    .setDepth(100)
+                    .setInteractive({ useHandCursor: true });
+                this.worldContainer.add(this.selectedPlantText);
+                this.selectedPlantText.on("pointerdown", () => {
+                    this.publishHarvestEvent(cfg.key);
+                });
+                this.input.once(
+                    "pointerdown",
+                    (pointer: Phaser.Input.Pointer, _gameObjects: any[]) => {
+                        // Only remove if not clicking the same plant again
+                        if (
+                            !img
+                                .getBounds()
+                                .contains(pointer.worldX, pointer.worldY)
+                        ) {
+                            if (this.selectedPlantText) {
+                                this.selectedPlantText.destroy();
+                                this.selectedPlantText = undefined;
+                            }
+                        }
+                    }
+                );
+            }
+            if (cfg.key === "gold-storage") {
+                console.log("Gold storage clicked");
                 // Add additional visual feedback or display information here
             }
         });
@@ -856,6 +895,26 @@ export class Game extends Scene {
                 plantName: name,
                 xCoordinate: x,
                 yCoordinate: y,
+            },
+        };
+        const rs = await client.publish(
+            "clash-of-farms-cache",
+            "clash-of-farms-topic",
+            JSON.stringify(payload)
+        );
+        // console.log(`Here is the ${rs}`);
+    }
+
+    private async publishHarvestEvent(itemKey: string) {
+        const client = await getMomentoClient();
+        const instance = AuthService.getInstance();
+        const user = instance.getUserFromIdToken();
+        const payload: PlantHarvestedEvent = {
+            eventType: "PlantHarvested",
+            playerId: user.userId,
+            timestamp: new Date().toISOString(),
+            payload: {
+                plantId: itemKey,
             },
         };
         const rs = await client.publish(
