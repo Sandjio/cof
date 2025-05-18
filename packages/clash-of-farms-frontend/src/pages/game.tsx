@@ -47,8 +47,9 @@ export default function GamePage() {
     return (
         <>
             <Head>
-                <title>CLASH OF FARMS</title>
+                <title>Clash Of Farms</title>
                 <meta name="description" content="Play Clash of Farms" />
+                <link rel="icon" href="/favicon.png" />
             </Head>
 
             <div

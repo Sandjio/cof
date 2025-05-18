@@ -28,11 +28,12 @@ export class Shop extends Scene {
         super("Shop");
         this.categories = [
             {
-                name: "Crops",
+                name: "Crops/Animals",
                 items: [
-                    { key: "corn", label: "Corn", cost: 50 },
-                    { key: "wheat", label: "Wheat", cost: 30 },
-                    { key: "tomato", label: "Tomato", cost: 70 },
+                    { key: "Corn", label: "Corn", cost: 50 },
+                    { key: "Wheat", label: "Wheat", cost: 30 },
+                    { key: "Tomato", label: "Tomato", cost: 70 },
+                    { key: "Chicken", label: "Chicken", cost: 200 },
                 ],
             },
             {
@@ -157,7 +158,7 @@ export class Shop extends Scene {
             try {
                 let purchasedItem: ShopItem = { ...item }; // Clone the item
                 switch (category.name) {
-                    case "Crops":
+                    case "Crops/Animals":
                         const response = await createPlant(
                             item.key,
                             item.label,

@@ -10,21 +10,39 @@ export class Preloader extends Scene {
     }
 
     init() {
-        //  A simple progress bar. This is the outline of the bar.
-        this.add.rectangle(512, 384, 468, 32).setStrokeStyle(1, 0xffffff);
+        // Get the center coordinates of the game canvas
+        const centerX = this.cameras.main.width / 2;
+        const centerY = this.cameras.main.height / 2;
 
-        //  This is the progress bar itself. It will increase in size from the left based on the % of progress.
-        const bar = this.add.rectangle(512 - 230, 384, 4, 28, 0xffffff);
+        // Set dimensions for the loading bar
+        const barWidth = 468;
+        const barHeight = 32;
+        const barInnerPadding = 4;
 
-        //  Use the 'progress' event emitted by the LoaderPlugin to update the loading bar
+        this.add
+            .rectangle(centerX, centerY, barWidth, barHeight)
+            .setStrokeStyle(1, 0xffffff);
+
+        const bar = this.add.rectangle(
+            centerX - barWidth / 2 + barInnerPadding, // Start position (left edge + padding)
+            centerY,
+            barInnerPadding, // Initial width
+            barHeight - barInnerPadding * 2, // Height with padding
+            0xffffff
+        );
+
+        // Set the origin to left-center for easier width calculations
+        bar.setOrigin(0, 0.5);
+
+        // Update the progress bar based on loading progress
         this.load.on("progress", (progress: number) => {
-            //  Update the progress bar (our bar is 464px wide, so 100% = 464px)
-            bar.width = 4 + 460 * progress;
+            // Update the bar width based on the progress (scaling to fit inside the outline with padding)
+            const maxBarWidth = barWidth - barInnerPadding * 2;
+            bar.width = maxBarWidth * progress;
         });
     }
 
     preload() {
-        //  Load the assets for the game - Replace with your own assets
         this.load.setPath("assets");
         this.load.image("backgroundImage", "background.png");
         this.load.audio("backgroundMusic", "/audio/springtime-symphony.mp3");
@@ -34,8 +52,10 @@ export class Preloader extends Scene {
         this.load.image("trophy", "golden-trophy-medium.png");
         this.load.image("fight", "fight.png");
         this.load.image("shop", "shop.png");
-        this.load.image("corn", "corn.png");
+        this.load.image("Corn", "corn.png");
         this.load.image("gold-storage", "gold-storage.png");
+        this.load.image("Chicken", "Chicken.png");
+        this.load.image("menu", "menu.png");
     }
 
     create() {
@@ -46,6 +66,7 @@ export class Preloader extends Scene {
 
             // console.log(userData);
             this.scene.start("MainMenu", { userData });
+            // this.scene.start("MainMenu");
         };
         loadMainScene();
     }

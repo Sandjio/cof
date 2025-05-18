@@ -5,6 +5,7 @@ import { getMomentoClient } from "@/utils/momento";
 import { AuthService } from "@/services/AuthService";
 import { PlantSeededEvent } from "shared/src/events/plantEvent";
 import { Plant, UserStats } from "shared/src/types/types";
+import { PlantHarvestedEvent } from "shared/src/events/plantEvent";
 
 interface PlaceableConfig {
     key: string;
@@ -33,6 +34,8 @@ export class Game extends Scene {
     private fight?: GameObjects.Image;
     private shop?: GameObjects.Image;
     private experienceText: GameObjects.Text;
+    private menu?: GameObjects.Image;
+    private selectedPlantText: GameObjects.Text | undefined;
 
     private uiCamera?: Phaser.Cameras.Scene2D.Camera;
     private worldContainer: Phaser.GameObjects.Container;
@@ -113,7 +116,7 @@ export class Game extends Scene {
         EventBus.on(
             "shop-purchased",
             (item: ShopItem, category: ShopCategory) => {
-                if (category.name === "Crops") {
+                if (category.name === "Crops/Animals") {
                     if (!this.mainCamera) {
                         console.error("Main camera is not initialized.");
                         return;
@@ -256,6 +259,14 @@ export class Game extends Scene {
         this.fight = this.add
             .image(60, this.scale.height - 100, "fight")
             .setScale(0.1);
+        // Add the Menu Icon
+        this.menu = this.add
+            .image(60, this.scale.height - 200, "menu")
+            .setScale(0.1)
+            .setInteractive({ useHandCursor: true })
+            .on("pointerdown", () => {
+                this.scene.start("MainMenu");
+            });
 
         // Add the shop icon at the bottom right of the scene
         this.shop = this.add
@@ -273,7 +284,8 @@ export class Game extends Scene {
             this.trophyText &&
             this.fight &&
             this.shop &&
-            this.experienceText
+            this.experienceText &&
+            this.menu
         ) {
             // Don't move with camera
             this.goldCoin.setScrollFactor(0);
@@ -283,6 +295,7 @@ export class Game extends Scene {
             this.fight.setScrollFactor(0);
             this.shop.setScrollFactor(0);
             this.experienceText.setScrollFactor(0);
+            this.menu.setScrollFactor(0);
 
             // Remove UI elements from the main camera
             this.cameras.main.ignore([
@@ -293,6 +306,7 @@ export class Game extends Scene {
                 this.fight,
                 this.shop,
                 this.experienceText,
+                this.menu,
             ]);
 
             // Ensure UI camera only sees UI elements
@@ -312,7 +326,8 @@ export class Game extends Scene {
             this.uiCamera &&
             this.fight &&
             this.shop &&
-            this.experienceText
+            this.experienceText &&
+            this.menu
         ) {
             // Resize UI camera viewport
             this.uiCamera.setSize(gameSize.width, gameSize.height);
@@ -335,6 +350,8 @@ export class Game extends Scene {
                 gameSize.width - 40,
                 gameSize.height - 100
             );
+
+            this.menu.setPosition(gameSize.width - 60, gameSize.height - 200);
 
             // Reposition debug text if it exists
             // if (this.debugText) {
@@ -496,11 +513,11 @@ export class Game extends Scene {
             if (this.mainCamera) {
                 this.mainCamera.scrollX -= deltaX / this.mainCamera.zoom;
                 this.mainCamera.scrollY -= deltaY / this.mainCamera.zoom;
-                console.log(
-                    "Camera scroll:",
-                    this.mainCamera.scrollX,
-                    this.mainCamera.scrollY
-                );
+                // console.log(
+                //     "Camera scroll:",
+                //     this.mainCamera.scrollX,
+                //     this.mainCamera.scrollY
+                // );
             }
 
             // Update last position
@@ -698,7 +715,7 @@ export class Game extends Scene {
                     0.5,
                     2.0
                 );
-                console.log("Keyboard zoom in:", newZoom);
+                // console.log("Keyboard zoom in:", newZoom);
                 this.mainCamera.zoomTo(newZoom, 200);
 
                 // if (this.debugText) {
@@ -714,7 +731,7 @@ export class Game extends Scene {
                     0.5,
                     2.0
                 );
-                console.log("Keyboard zoom out:", newZoom);
+                // console.log("Keyboard zoom out:", newZoom);
                 this.mainCamera.zoomTo(newZoom, 200);
 
                 // if (this.debugText) {
@@ -807,10 +824,47 @@ export class Game extends Scene {
         // ensure it lives in the worldContainer so camera pans/zooms affect it
         this.worldContainer.add(img);
 
-        // emit an event when clicked
         img.on("pointerdown", () => {
             if ((img as any).gameObjectType === "plant") {
                 console.log(`Selected plant with ID: ${(img as any).plantId}`);
+                // Add additional visual feedback or display information here
+                if (this.selectedPlantText) {
+                    this.selectedPlantText.destroy();
+                }
+                this.selectedPlantText = this.add
+                    .text(cfg.x, cfg.y - 60, `Harvest: ${cfg.key}`, {
+                        fontFamily: "Arial",
+                        fontSize: "18px",
+                        color: "#00ff00",
+                        backgroundColor: "#222",
+                        padding: { x: 8, y: 4 },
+                    })
+                    .setOrigin(0.5)
+                    .setDepth(100)
+                    .setInteractive({ useHandCursor: true });
+                this.worldContainer.add(this.selectedPlantText);
+                this.selectedPlantText.on("pointerdown", () => {
+                    this.publishHarvestEvent(cfg.key);
+                });
+                this.input.once(
+                    "pointerdown",
+                    (pointer: Phaser.Input.Pointer, _gameObjects: any[]) => {
+                        // Only remove if not clicking the same plant again
+                        if (
+                            !img
+                                .getBounds()
+                                .contains(pointer.worldX, pointer.worldY)
+                        ) {
+                            if (this.selectedPlantText) {
+                                this.selectedPlantText.destroy();
+                                this.selectedPlantText = undefined;
+                            }
+                        }
+                    }
+                );
+            }
+            if (cfg.key === "gold-storage") {
+                console.log("Gold storage clicked");
                 // Add additional visual feedback or display information here
             }
         });
@@ -841,6 +895,26 @@ export class Game extends Scene {
                 plantName: name,
                 xCoordinate: x,
                 yCoordinate: y,
+            },
+        };
+        const rs = await client.publish(
+            "clash-of-farms-cache",
+            "clash-of-farms-topic",
+            JSON.stringify(payload)
+        );
+        // console.log(`Here is the ${rs}`);
+    }
+
+    private async publishHarvestEvent(itemKey: string) {
+        const client = await getMomentoClient();
+        const instance = AuthService.getInstance();
+        const user = instance.getUserFromIdToken();
+        const payload: PlantHarvestedEvent = {
+            eventType: "PlantHarvested",
+            playerId: user.userId,
+            timestamp: new Date().toISOString(),
+            payload: {
+                plantId: itemKey,
             },
         };
         const rs = await client.publish(
