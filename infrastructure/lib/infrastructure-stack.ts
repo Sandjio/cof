@@ -30,11 +30,22 @@ export class InfrastructureStack extends cdk.Stack {
     if (!process.env.USER_POOL_CLIENT_NAME) {
       throw new Error("USER_POOL_CLIENT_NAME environment variable is not set");
     }
+    if (!process.env.TOPIC_NAME) {
+      throw new Error("TOPIC_NAME environment variable is not set");
+    }
+    if (!process.env.MOMENTO_SECRET_ARN) {
+      throw new Error("MOMENTO_SECRET_ARN environment variable is not set");
+    }
+    if (!process.env.CACHE_NAME) {
+      throw new Error("CACHE_NAME environment variable is not set");
+    }
+
+    const MOMENTO_SECRET_ARN = process.env.MOMENTO_SECRET_ARN;
 
     const momentoApiKeySecret = secretsmanager.Secret.fromSecretCompleteArn(
       this,
       "MomentoApiKeySecret",
-      "arn:aws:secretsmanager:us-east-1:223325094309:secret:clash-of-farms/momento-api-key-hVVNf2"
+      MOMENTO_SECRET_ARN
     );
     // Create a Cognito User Pool
     const userPool = new cognito.UserPool(this, "ClashOfFarmsUserPool", {
@@ -124,11 +135,11 @@ export class InfrastructureStack extends cdk.Stack {
         handler: "handler",
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
-          CACHE_NAME: process.env.CACHE_NAME!,
+          CACHE_NAME: process.env.CACHE_NAME,
           SECRET_ARN: momentoApiKeySecret.secretArn,
         },
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
       }
@@ -156,11 +167,11 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/tokenVendingMachine.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
-          TOPIC_NAME: process.env.TOPIC_NAME!,
+          TOPIC_NAME: process.env.TOPIC_NAME,
           SECRET_ARN: momentoApiKeySecret.secretArn,
         },
       }
@@ -180,12 +191,12 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/players/getProfile.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
-          CACHE_NAME: process.env.CACHE_NAME!,
+          CACHE_NAME: process.env.CACHE_NAME,
           SECRET_ARN: momentoApiKeySecret.secretArn,
         },
       }
@@ -208,11 +219,11 @@ export class InfrastructureStack extends cdk.Stack {
         ),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
-          CACHE_NAME: process.env.CACHE_NAME!,
+          CACHE_NAME: process.env.CACHE_NAME,
           SECRET_ARN: momentoApiKeySecret.secretArn,
         },
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
       }
@@ -235,11 +246,11 @@ export class InfrastructureStack extends cdk.Stack {
         ),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
-          CACHE_NAME: process.env.CACHE_NAME!,
+          CACHE_NAME: process.env.CACHE_NAME,
           SECRET_ARN: momentoApiKeySecret.secretArn,
         },
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
       }
@@ -261,13 +272,13 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/plants/plantSeedEvent.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         timeout: Duration.seconds(30),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
-          CACHE_NAME: process.env.CACHE_NAME!,
+          CACHE_NAME: process.env.CACHE_NAME,
           SECRET_ARN: momentoApiKeySecret.secretArn,
         },
       }
@@ -289,16 +300,14 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/attack/startBattle.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         timeout: Duration.seconds(60),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
           SECRET_ARN: momentoApiKeySecret.secretArn,
-          SECRET_NAME: "clash-of-farms/momento-api-key",
-          CACHE_NAME: process.env.CACHE_NAME!,
-          DEBUG: "true",
+          CACHE_NAME: process.env.CACHE_NAME,
         },
       }
     );
@@ -318,13 +327,13 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/plants/getPlants.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
           SECRET_ARN: momentoApiKeySecret.secretArn,
-          CACHE_NAME: process.env.CACHE_NAME!,
+          CACHE_NAME: process.env.CACHE_NAME,
         },
       }
     );
@@ -344,7 +353,7 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/defense/getDefenseTroops.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
@@ -367,13 +376,13 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/attack/createAttackTroop.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
           GAME_TABLE_NAME: gameTable.tableName,
           SECRET_ARN: momentoApiKeySecret.secretArn,
-          CACHE_NAME: process.env.CACHE_NAME!,
+          CACHE_NAME: process.env.CACHE_NAME,
         },
       }
     );
@@ -393,7 +402,7 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/attack/getAttackTroops.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
@@ -416,7 +425,7 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/players/upgradeTroop.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
@@ -439,7 +448,7 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/attack/createAttackRecipe.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
@@ -461,7 +470,7 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/attack/getAttackRecipes.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
@@ -484,7 +493,7 @@ export class InfrastructureStack extends cdk.Stack {
           "packages/backend/src/handlers/attack/getBattleResults.ts"
         ),
         bundling: {
-          externalModules: ["aws-lambda"],
+          externalModules: ["aws-lambda", "aws-sdk"],
         },
         projectRoot: path.join(__dirname, "../.."),
         environment: {
